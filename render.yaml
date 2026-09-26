@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: summer-seoul-chat-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_BASE_URL
+        value: https://copa.codyssey.kr/v1
+      - key: OPENAI_MODEL
+        value: gpt-5-mini
+      - key: FIREBASE_SERVICE_ACCOUNT_PATH
+        value: /etc/secrets/firebase-key.json
+      - key: ALLOWED_ORIGINS
+        sync: false
