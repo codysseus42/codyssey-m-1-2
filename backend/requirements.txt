@@ -1,0 +1,5 @@
+fastapi==0.141.1
+uvicorn==0.46.0
+firebase-admin==7.7.0
+openai==3.19.2
+python-dotenv==1.2.2
