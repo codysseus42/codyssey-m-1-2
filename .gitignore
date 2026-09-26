@@ -1,0 +1,12 @@
+# 비밀값 — 절대 커밋하지 않는다
+.env
+firebase-key.json
+*-firebase-adminsdk-*.json
+
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+
+# 빌드 산출물
+frontend/dist/
