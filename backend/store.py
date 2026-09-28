@@ -6,7 +6,9 @@
 
 import json
 import os
+import time
 from datetime import datetime, timezone
+from threading import Lock
 
 from errors import ConflictError, NotFoundError, StoreUnavailableError
 from models import DataCreate, DataItem, DataUpdate, Message
@@ -14,6 +16,11 @@ from models import DataCreate, DataItem, DataUpdate, Message
 DATA = "data"
 CONVERSATIONS = "conversations"
 META_FIELDS = ["title", "created_at", "updated_at", "message_count"]
+
+# data 컬렉션 전체 읽기(788건)를 요청마다 반복하면 Spark 무료 한도(읽기 5만/일)를
+# 새로고침 30번 남짓에 다 쓴다. 이 서버를 거친 쓰기는 즉시 캐시를 비우고,
+# 콘솔 직접 수정·seed.py 같은 외부 변경은 TTL이 지나면 반영된다.
+DATA_CACHE_TTL_S = 600
 
 
 def _now() -> datetime:
@@ -44,14 +51,27 @@ def create_firestore_client():
 
 
 class FirestoreStore:
-    def __init__(self, client):
+    def __init__(self, client, cache_ttl_s: float = DATA_CACHE_TTL_S, clock=time.monotonic):
         self.db = client
+        self._cache: list[DataItem] | None = None
+        self._cache_expires = 0.0
+        self._cache_ttl = cache_ttl_s
+        self._clock = clock
+        self._lock = Lock()
 
     # ---------- 데이터 ----------
 
     def list_data(self) -> list[DataItem]:
-        docs = self.db.collection(DATA).order_by("date").stream()
-        return [DataItem(id=d.id, **d.to_dict()) for d in docs]
+        with self._lock:
+            if self._cache is None or self._clock() >= self._cache_expires:
+                docs = self.db.collection(DATA).order_by("date").stream()
+                self._cache = [DataItem(id=d.id, **d.to_dict()) for d in docs]
+                self._cache_expires = self._clock() + self._cache_ttl
+            return list(self._cache)
+
+    def _invalidate(self) -> None:
+        with self._lock:
+            self._cache = None
 
     def create_data(self, item: DataCreate) -> DataItem:
         doc_id = item.date.isoformat()
@@ -60,6 +80,7 @@ class FirestoreStore:
             raise ConflictError()
         payload = {"date": doc_id, "value": item.value, "memo": item.memo}
         ref.set(payload)
+        self._invalidate()
         return DataItem(id=doc_id, **payload)
 
     def update_data(self, doc_id: str, item: DataUpdate) -> DataItem:
@@ -68,6 +89,7 @@ class FirestoreStore:
         if not snap.exists:
             raise NotFoundError("해당 날짜의 데이터가 없습니다.")
         ref.update({"value": item.value, "memo": item.memo})
+        self._invalidate()
         return DataItem(id=doc_id, **{**snap.to_dict(), "value": item.value, "memo": item.memo})
 
     def delete_data(self, doc_id: str) -> None:
@@ -75,6 +97,7 @@ class FirestoreStore:
         if not ref.get().exists:
             raise NotFoundError("해당 날짜의 데이터가 없습니다.")
         ref.delete()
+        self._invalidate()
 
     # ---------- 대화 ----------
 
