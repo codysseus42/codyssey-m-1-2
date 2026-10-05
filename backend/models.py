@@ -66,17 +66,25 @@ class Point(BaseModel):
 
 
 class Summary(BaseModel):
+    """현재 달 이전 = 관측값, 현재 달부터 = 사용자가 입력한 예측값.
+    기간·개수·평균·최고·최저·최근·추세·10년 평균은 관측값 기준이다."""
+
+    today: dt.date = Field(description="요약 기준일 (한국 시간)")
     period: str = Field(examples=["1961-01 ~ 2026-08"])
     count: int
     average: float
-    maximum: Point
-    minimum: Point
+    maximum: Point = Field(description="최고 (예측값 제외)")
+    minimum: Point = Field(description="최저 (예측값 제외)")
+    maximum_with_forecast: Point = Field(description="최고 (예측값 포함)")
+    minimum_with_forecast: Point = Field(description="최저 (예측값 포함)")
     latest: Point
     trend: Literal["상승", "하락", "유지", "데이터 부족"]
     trend_detail: str
     summer_by_decade: dict[str, float] = Field(
         description="여름(6~8월) 월평균 불쾌지수의 10년 단위 평균"
     )
+    forecast_count: int = Field(description="예측값 개수 (현재 달 이후)")
+    forecast_period: str | None = Field(default=None, examples=["2026-10 ~ 2026-12"])
 
 
 # ---------- 대화 ----------

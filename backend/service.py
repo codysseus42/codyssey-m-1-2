@@ -1,11 +1,12 @@
 """비즈니스 로직: 데이터 요약 계산과 채팅(컨텍스트 주입) 흐름."""
 
+import datetime as dt
 import os
 from collections import defaultdict
 from statistics import fmean
 
 from errors import AIServiceError
-from models import DataItem, Message, Point, Summary
+from models import DataItem, Message, Point, Summary, today_kst
 
 TREND_THRESHOLD = 0.5  # 12개월 평균 차이가 이보다 작으면 '유지'
 HISTORY_LIMIT = 10  # 모델에 함께 보낼 이전 메시지 수
@@ -27,32 +28,48 @@ SYSTEM_TEMPLATE = """\
 당신은 서울 여름 체감 기후 데이터를 설명하는 분석 비서입니다.
 사용자의 데이터는 기상청 서울(108) 관측소의 월평균 불쾌지수입니다.
 
-[데이터 요약 — 현재 DB 기준]
+오늘 날짜: {today} (한국 시간). {current_month}은 아직 끝나지 않은 달입니다.
+
+[데이터 요약 — 관측값 기준 (현재 달 이전)]
 - 기간: {period}
 - 레코드: {count}개 (월 단위)
 - 평균 불쾌지수: {average}
-- 최고: {max_value} ({max_date}) / 최저: {min_value} ({min_date})
+- 최고: {max_value} ({max_date}) / 최저: {min_value} ({min_date}) — 예측값 제외
 - 가장 최근: {latest_value} ({latest_date})
 - 최근 추세: {trend} — {trend_detail}
 - 여름 월평균 불쾌지수(10년 단위): {summer}
+
+[예측값 — 현재 달 이후, 사용자가 직접 입력한 값]
+- {forecast}
 
 [분석 결론 — M1-1 리포트]
 {notes}
 
 규칙:
 - 위 요약과 분석 결론에 있는 수치만 근거로 답하고, 없는 수치는 추측하지 말고 없다고 말하세요.
+- 현재 달 이후의 값은 관측값이 아니라 예측값입니다. 예측값을 말할 때는 반드시 예측값이라고 밝히고, 관측값과 섞어 결론을 내리지 마세요.
 - 관찰(수치)과 해석(가능한 원인)을 구분해서 말하세요.
 - 한국어로 3~6문장 이내로 답하세요."""
 
 
-def compute_summary(records: list[DataItem]) -> Summary | None:
-    """요약을 계산한다. 데이터가 없으면 None."""
+def compute_summary(records: list[DataItem], today: dt.date | None = None) -> Summary | None:
+    """요약을 계산한다. 데이터가 없으면 None.
+
+    현재 달(진행 중) 이전은 관측값, 현재 달부터는 예측값으로 나눈다.
+    통계는 관측값으로 계산하고, 최고·최저만 예측값 포함 값을 따로 둔다.
+    """
     if not records:
         return None
-    records = sorted(records, key=lambda r: r.date)
+    today = today or today_kst()
+    month_start = today.replace(day=1)
+    everything = sorted(records, key=lambda r: r.date)
+    forecast = [r for r in everything if r.date >= month_start]
+    records = [r for r in everything if r.date < month_start] or everything  # 관측값이 없으면 전체로
     values = [r.value for r in records]
     top = max(records, key=lambda r: r.value)
     bottom = min(records, key=lambda r: r.value)
+    top_all = max(everything, key=lambda r: r.value)
+    bottom_all = min(everything, key=lambda r: r.value)
 
     # 최근 12개월 vs 직전 12개월: 12개월 창이라 계절성이 서로 상쇄된다.
     if len(records) >= 24:
@@ -70,22 +87,38 @@ def compute_summary(records: list[DataItem]) -> Summary | None:
             summer[f"{r.date.year // 10 * 10}s"].append(r.value)
 
     return Summary(
+        today=today,
         period=f"{records[0].date:%Y-%m} ~ {records[-1].date:%Y-%m}",
         count=len(records),
         average=round(fmean(values), 2),
         maximum=Point(date=top.date, value=top.value),
         minimum=Point(date=bottom.date, value=bottom.value),
+        maximum_with_forecast=Point(date=top_all.date, value=top_all.value),
+        minimum_with_forecast=Point(date=bottom_all.date, value=bottom_all.value),
         latest=Point(date=records[-1].date, value=records[-1].value),
         trend=trend,
         trend_detail=detail,
         summer_by_decade={k: round(fmean(v), 2) for k, v in sorted(summer.items())},
+        forecast_count=len(forecast),
+        forecast_period=f"{forecast[0].date:%Y-%m} ~ {forecast[-1].date:%Y-%m}" if forecast else None,
     )
 
 
 def build_system_prompt(summary: Summary | None) -> str:
     if summary is None:
         return "당신은 분석 비서입니다. 현재 저장된 데이터가 없으니, 데이터가 없다고 안내하세요."
+    if summary.forecast_count:
+        hi, lo = summary.maximum_with_forecast, summary.minimum_with_forecast
+        forecast = (
+            f"{summary.forecast_count}개 ({summary.forecast_period}). "
+            f"예측값 포함 최고: {hi.value} ({hi.date:%Y-%m}) / 최저: {lo.value} ({lo.date:%Y-%m})"
+        )
+    else:
+        forecast = "없음"
     return SYSTEM_TEMPLATE.format(
+        today=summary.today.isoformat(),
+        current_month=f"{summary.today:%Y-%m}",
+        forecast=forecast,
         period=summary.period,
         count=summary.count,
         average=summary.average,

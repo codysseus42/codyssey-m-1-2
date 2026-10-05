@@ -210,6 +210,29 @@ def test_chat_validation_and_errors(ctx):
     assert store.convs == {}  # 실패하면 저장하지 않는다
 
 
+def test_forecast_split_by_today():
+    rows = [DataItem(id=f"2026-{m:02d}-01", date=date(2026, m, 1), value=v, memo=None)
+            for m, v in [(7, 77.0), (8, 78.0), (9, 70.0), (10, 90.0), (11, 20.0)]]
+    s = compute_summary(rows, today=date(2026, 10, 5))
+    assert s.today == date(2026, 10, 5)
+    assert s.period == "2026-07 ~ 2026-09" and s.count == 3      # 관측값만
+    assert s.latest.date == date(2026, 9, 1)
+    assert s.maximum.value == 78.0 and s.minimum.value == 70.0    # 예측값 제외
+    assert s.maximum_with_forecast.value == 90.0                   # 예측값 포함
+    assert s.minimum_with_forecast.value == 20.0
+    assert s.forecast_count == 2 and s.forecast_period == "2026-10 ~ 2026-11"
+    prompt = build_system_prompt(s)
+    assert "오늘 날짜: 2026-10-05" in prompt
+    assert "2개 (2026-10 ~ 2026-11)" in prompt and "최고: 90.0 (2026-10)" in prompt
+
+
+def test_no_forecast_prompt_says_none():
+    rows = [DataItem(id="2026-08-01", date=date(2026, 8, 1), value=78.0, memo=None)]
+    s = compute_summary(rows, today=date(2026, 10, 5))
+    assert s.forecast_count == 0 and s.maximum == s.maximum_with_forecast
+    assert "- 없음" in build_system_prompt(s)
+
+
 def test_system_prompt_without_data():
     assert "데이터가 없" in build_system_prompt(None)
 

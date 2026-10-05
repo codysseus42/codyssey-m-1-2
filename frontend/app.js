@@ -72,6 +72,12 @@ const fmtTime = (iso) =>
 
 // ---------- 요약 ----------
 
+// 카드 보조 문구: 관측 최고·최저 날짜, 예측값을 넣으면 값이 달라질 때만 "예측 포함" 값을 덧붙인다.
+function withForecast(observed, all) {
+  const base = ym(observed.date);
+  return all.date === observed.date ? base : `${base} · 예측 포함 ${all.value} (${ym(all.date)})`;
+}
+
 async function loadSummary() {
   const box = $("summary");
   try {
@@ -85,11 +91,11 @@ async function loadSummary() {
         el("div", { class: "value" }, String(value)),
         note ? el("div", { class: "note" }, note) : "");
     box.replaceChildren(
-      card("기간", s.period),
+      card("기간", s.period, s.forecast_count ? `관측값 · 예측 ${s.forecast_count}개월 별도` : "관측값"),
       card("레코드", `${s.count}개월`),
       card("평균 불쾌지수", s.average),
-      card("최고", s.maximum.value, ym(s.maximum.date)),
-      card("최저", s.minimum.value, ym(s.minimum.date)),
+      card("최고", s.maximum.value, withForecast(s.maximum, s.maximum_with_forecast)),
+      card("최저", s.minimum.value, withForecast(s.minimum, s.minimum_with_forecast)),
       card("최근 12개월 추세", s.trend, s.trend_detail.split("(")[1]?.replace(")", "") ?? ""),
       card("여름 평균", `${firstVal} → ${lastVal}`, `${firstDec} → ${lastDec}`),
     );
