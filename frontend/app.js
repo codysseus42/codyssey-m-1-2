@@ -108,6 +108,21 @@ function renderMessage(role, content, extraClass = "") {
   return node;
 }
 
+// 답변을 기다리는 동안 채팅창에 . → .. → ... 이 반복되는 말풍선을 띄운다.
+function showTyping() {
+  const bubble = renderMessage("assistant", ".", "loading");
+  bubble.setAttribute("aria-label", "답변 생성 중");
+  let n = 1;
+  const timer = setInterval(() => {
+    n = (n % 3) + 1;
+    bubble.textContent = ".".repeat(n);
+  }, 400);
+  return () => {
+    clearInterval(timer);
+    bubble.remove();
+  };
+}
+
 function setChatBusy(busy) {
   $("chat-send").disabled = busy;
   $("chat-input").disabled = busy;
@@ -125,19 +140,19 @@ async function sendMessage(event) {
   }
   renderMessage("user", message);
   input.value = "";
-  const loading = renderMessage("assistant", "데이터를 확인하고 있어요…", "loading");
+  const stopTyping = showTyping();
   setChatBusy(true);
   try {
     const res = await api("/api/chat", {
       method: "POST",
       body: JSON.stringify({ message, conversation_id: state.conversationId }),
     });
-    loading.remove();
+    stopTyping();
     renderMessage("assistant", res.reply);
     state.conversationId = res.conversation_id;
     loadHistory();
   } catch (err) {
-    loading.remove();
+    stopTyping();
     renderMessage("error", err.message, "error");
   } finally {
     setChatBusy(false);
@@ -295,6 +310,18 @@ async function deleteData(id) {
     dataMessage(err.message, "error");
   }
 }
+
+// ---------- 화면 전환: 소개 ↔ 대시보드 ----------
+
+function showScreen() {
+  const inApp = location.hash === "#app";
+  $("intro").hidden = inApp;
+  $("app").hidden = !inApp;
+}
+
+$("start").addEventListener("click", () => { location.hash = "app"; });
+window.addEventListener("hashchange", showScreen);
+showScreen();
 
 // ---------- 시작 ----------
 
