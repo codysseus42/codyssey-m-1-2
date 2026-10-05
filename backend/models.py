@@ -3,11 +3,24 @@
 import math
 import datetime as dt
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, Field, field_validator
 
 
 # ---------- 데이터 ----------
+
+FORECAST_MONTHS = 6  # 현재 달을 포함해 앞으로 6개월까지 (예측값) 입력 허용
+
+
+def today_kst() -> dt.date:
+    return dt.datetime.now(ZoneInfo("Asia/Seoul")).date()
+
+
+def latest_allowed_month(today: dt.date) -> dt.date:
+    """현재 달을 포함해 FORECAST_MONTHS번째 달의 1일."""
+    index = today.year * 12 + today.month - 1 + FORECAST_MONTHS - 1
+    return dt.date(index // 12, index % 12 + 1, 1)
 
 
 class DataBase(BaseModel):
@@ -23,7 +36,17 @@ class DataBase(BaseModel):
 
 
 class DataCreate(DataBase):
-    date: dt.date = Field(examples=["2026-08-01"])
+    date: dt.date = Field(examples=["2026-08-01"], description="매달 1일 (YYYY-MM-01)")
+
+    @field_validator("date")
+    @classmethod
+    def date_must_be_valid_month(cls, v: dt.date) -> dt.date:
+        if v.day != 1:
+            raise ValueError("date는 매달 1일(YYYY-MM-01)이어야 합니다")
+        limit = latest_allowed_month(today_kst())
+        if v > limit:
+            raise ValueError(f"현재 달을 포함해 6개월({limit:%Y-%m})까지만 입력할 수 있습니다")
+        return v
 
 
 class DataUpdate(DataBase):

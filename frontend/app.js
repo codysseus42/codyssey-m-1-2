@@ -39,6 +39,7 @@ async function api(path, options = {}) {
 
 function errorMessage(status, body) {
   if (typeof body.detail === "string") return body.detail;
+  if (Array.isArray(body.detail) && body.detail[0]?.msg) return body.detail[0].msg.replace(/^Value error, /, "");
   if (status === 422) return "입력값을 확인해 주세요.";
   return `요청 실패 (${status})`;
 }
@@ -248,15 +249,50 @@ async function loadData() {
   }
 }
 
+// ---------- 월 입력 규칙: 현재 달 포함 6개월까지, 현재·미래 달은 예측값임을 알린다 ----------
+
+const FORECAST_MONTHS = 6;
+const pad2 = (n) => String(n).padStart(2, "0");
+const monthOf = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+const todayText = () => { const d = new Date(); return `${monthOf(d)}-${pad2(d.getDate())}`; };
+
+function addMonths(ymText, k) {
+  const [y, m] = ymText.split("-").map(Number);
+  const i = y * 12 + (m - 1) + k;
+  return `${Math.floor(i / 12)}-${pad2((i % 12) + 1)}`;
+}
+
+function latestAllowedMonth() {
+  return addMonths(monthOf(new Date()), FORECAST_MONTHS - 1);
+}
+
+// null: 과거 달(안내 없음) / {block}: 입력 불가 / {text}: 예측값 안내
+function monthNotice(ymText) {
+  const now = monthOf(new Date());
+  const limit = latestAllowedMonth();
+  if (ymText > limit) return { block: true, text: `현재 달을 포함해 6개월(${limit})까지만 입력할 수 있습니다.` };
+  if (ymText === now) return { text: `${ymText}은 아직 끝나지 않은 달입니다(오늘 ${todayText()}). 월 전체 관측값이 아니라 예측값을 입력하시는 건가요?` };
+  if (ymText > now) return { text: `${ymText}은 아직 오지 않은 달입니다(오늘 ${todayText()}). 미래 예측값을 입력하시는 건가요?` };
+  return null;
+}
+
+function showMonthNotice() {
+  const v = $("f-date").value;
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(v)) return dataMessage("");
+  const n = monthNotice(v);
+  dataMessage(n ? n.text : "", n?.block ? "error" : n ? "warn" : "");
+}
+
 function startEdit(item) {
   state.editingId = item.id;
-  $("f-date").value = item.date;
+  $("f-date").value = ym(item.date);
   $("f-date").disabled = true; // 날짜가 문서 ID라 수정 대상이 아니다
   $("f-value").value = item.value;
   $("f-memo").value = item.memo ?? "";
   $("f-submit").textContent = "수정 저장";
   $("f-cancel").hidden = false;
-  dataMessage(`${ym(item.date)} 수정 중`);
+  const notice = monthNotice(ym(item.date));
+  dataMessage(notice ? `${ym(item.date)} 수정 중 — ${notice.text}` : `${ym(item.date)} 수정 중`, notice ? "warn" : "");
   document.querySelectorAll("#data-rows tr").forEach((tr) => tr.classList.toggle("editing", tr.dataset.id === item.id));
   $("f-value").focus();
 }
@@ -275,20 +311,25 @@ async function saveData(event) {
   const value = Number($("f-value").value);
   const memo = $("f-memo").value.trim() || null;
   const editing = state.editingId;
-  if (!editing && !$("f-date").value) return dataMessage("날짜를 입력해 주세요.", "error");
+  const month = editing ? ym(editing) : $("f-date").value;
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return dataMessage("월을 YYYY-MM 형식으로 입력해 주세요.", "error");
   if ($("f-value").value === "" || !Number.isFinite(value)) return dataMessage("불쾌지수를 숫자로 입력해 주세요.", "error");
+  const notice = monthNotice(month);
+  if (notice?.block) return dataMessage(notice.text, "error");
+  if (notice && !confirm(notice.text)) return;
+  const tag = notice ? " (예측값)" : "";
 
   $("f-submit").disabled = true;
   try {
     if (editing) {
       await api(`/api/data/${editing}`, { method: "PUT", body: JSON.stringify({ value, memo }) });
-      dataMessage(`${ym(editing)} 수정 완료`, "ok");
+      dataMessage(`${month} 수정 완료${tag}`, "ok");
     } else {
       const created = await api("/api/data", {
         method: "POST",
-        body: JSON.stringify({ date: $("f-date").value, value, memo }),
+        body: JSON.stringify({ date: `${month}-01`, value, memo }),
       });
-      dataMessage(`${created.date} 추가 완료`, "ok");
+      dataMessage(`${ym(created.date)} 추가 완료${tag}`, "ok");
     }
     resetForm();
     await Promise.all([loadData(), loadSummary()]); // 요약도 즉시 갱신
@@ -334,6 +375,9 @@ $("chat-input").addEventListener("keydown", (e) => {
 });
 $("new-chat").addEventListener("click", newConversation);
 $("data-form").addEventListener("submit", saveData);
+$("f-date").max = latestAllowedMonth();
+$("f-date").addEventListener("change", showMonthNotice);
+$("f-date").addEventListener("input", showMonthNotice);
 $("f-cancel").addEventListener("click", () => { resetForm(); dataMessage(""); });
 
 loadSummary();

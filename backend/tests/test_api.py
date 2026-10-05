@@ -117,6 +117,22 @@ def test_data_crud_roundtrip(ctx):
     assert client.put("/api/data/2026-08-01", json={"value": 1}).status_code == 404
 
 
+def test_date_rules(ctx, monkeypatch):
+    client, _, _ = ctx
+    monkeypatch.setattr("models.today_kst", lambda: date(2026, 10, 5))
+    post = lambda d: client.post("/api/data", json={"date": d, "value": 70}).status_code
+    assert post("2026-09-15") == 422       # 월 첫날이 아님
+    assert post("2027-03-01") == 201       # 현재 달 포함 6개월째 → 허용
+    assert post("2027-04-01") == 422       # 7개월째 → 거절
+    assert post("1961-01-01") == 201       # 과거는 제한 없음
+
+
+def test_latest_allowed_month_crosses_year():
+    from models import latest_allowed_month
+    assert latest_allowed_month(date(2026, 10, 5)) == date(2027, 3, 1)
+    assert latest_allowed_month(date(2026, 7, 31)) == date(2026, 12, 1)
+
+
 @pytest.mark.parametrize("body", [
     {"value": 1},                                   # date 누락
     {"date": "2026-13-01", "value": 1},             # 잘못된 날짜
