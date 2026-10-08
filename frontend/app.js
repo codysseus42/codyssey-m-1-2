@@ -12,7 +12,7 @@ async function api(path, options = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
   const slow = setTimeout(
-    () => showNotice("서버가 깨어나는 중입니다. 무료 서버라 첫 요청은 최대 1분 정도 걸릴 수 있어요."),
+    () => showNotice("응답이 늦어지고 있어요. 무료 서버가 잠들어 있었다면 깨어나는 데 최대 1분 걸릴 수 있어요."),
     SLOW_MS,
   );
   state.pending++;
