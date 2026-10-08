@@ -89,7 +89,7 @@ class FirestoreStore:
         if not snap.exists:
             raise NotFoundError("해당 날짜의 데이터가 없습니다.")
         changes = {"value": item.value, "memo": item.memo}
-        if item.starred is not None:  # 보내지 않으면 기존 별표 유지
+        if item.starred is not None:  # 보내지 않으면 기존 즐겨찾기 유지
             changes["starred"] = item.starred
         ref.update(changes)
         self._invalidate()

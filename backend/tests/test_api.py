@@ -253,24 +253,24 @@ def test_highlights_merge_max_min_and_stars():
         return DataItem(id=f"{y}-{m:02d}-01", date=date(y, m, 1), value=v, memo=memo, starred=starred)
     rows = [
         row(1963, 1, 23.3, "역대 최저 추위"),                 # 최저
-        row(1994, 8, 79.0, "1994 폭염", starred=True),        # 별표만
-        row(2024, 8, 80.7, "역대급 폭염", starred=True),      # 최고 + 별표 → 한 줄
+        row(1994, 8, 79.0, "1994 폭염", starred=True),        # 즐겨찾기만
+        row(2024, 8, 80.7, "역대급 폭염", starred=True),      # 최고 + 즐겨찾기 → 한 줄
         row(2026, 9, 70.0),
-        row(2026, 11, 85.0, "내 예측", starred=True),         # 예측 포함 최고 + 별표 + 예측값
+        row(2026, 11, 85.0, "내 예측", starred=True),         # 예측 포함 최고 + 즐겨찾기 + 예측값
     ]
     s = compute_summary(rows, today=date(2026, 10, 5))
     got = {f"{h.date:%Y-%m}": h.tags for h in s.highlights}
     assert got == {
         "1963-01": ["최저"],
-        "1994-08": ["별표"],
-        "2024-08": ["최고", "별표"],
-        "2026-11": ["예측 포함 최고", "별표", "예측값"],
+        "1994-08": ["즐겨찾기"],
+        "2024-08": ["최고", "즐겨찾기"],
+        "2026-11": ["예측 포함 최고", "즐겨찾기", "예측값"],
     }
     assert [f"{h.date:%Y-%m}" for h in s.highlights] == sorted(got)  # 날짜순
     prompt = build_system_prompt(s)
-    assert "- 2024-08: 80.7 [최고·별표] 메모: 역대급 폭염" in prompt
+    assert "- 2024-08: 80.7 [최고·즐겨찾기] 메모: 역대급 폭염" in prompt
     assert prompt.count("2024-08: 80.7 [") == 1                       # 중복 없이 한 줄
-    assert "즐겨찾기와 별표는 같은 뜻" in prompt and "그달에는" in prompt
+    assert "즐겨찾기하신 달은 N개예요" in prompt and "그달에는" in prompt and "별표" not in prompt
 
 
 def test_prompt_classifies_input_types():

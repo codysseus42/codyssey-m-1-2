@@ -264,7 +264,7 @@ function renderData() {
     t.setAttribute("aria-selected", String(on));
   });
   if (rows.length === 0) {
-    const text = state.filter === "starred" ? "별표한 달이 없습니다. ☆를 눌러 추가하세요." : "데이터가 없습니다.";
+    const text = state.filter === "starred" ? "즐겨찾기한 달이 없습니다. ☆를 눌러 추가하세요." : "데이터가 없습니다.";
     return $("data-rows").replaceChildren(el("tr", {}, el("td", { colspan: "4", class: "muted" }, text)));
   }
   $("data-rows").replaceChildren(
@@ -285,8 +285,8 @@ function renderData() {
           el("button", {
             class: d.starred ? "link star on" : "link star",
             type: "button",
-            title: d.starred ? "별표 해제" : "별표 (AI가 이 달의 메모를 참고)",
-            "aria-label": d.starred ? "별표 해제" : "별표",
+            title: d.starred ? "즐겨찾기 해제" : "즐겨찾기 (AI가 이 달의 메모를 참고)",
+            "aria-label": d.starred ? "즐겨찾기 해제" : "즐겨찾기",
             "aria-pressed": String(Boolean(d.starred)),
             onclick: () => toggleStar(d),
           }, d.starred ? "★" : "☆"),
@@ -403,7 +403,7 @@ async function saveData(event) {
   }
 }
 
-// 별표만 바꾼다. 값·메모는 그대로 보내고, 요약(주요 달)도 다시 불러온다.
+// 즐겨찾기만 바꾼다. 값·메모는 그대로 보내고, 요약(주요 달)도 다시 불러온다.
 async function toggleStar(item) {
   const starred = !item.starred;
   try {
@@ -411,7 +411,7 @@ async function toggleStar(item) {
       method: "PUT",
       body: JSON.stringify({ value: item.value, memo: item.memo ?? null, starred }),
     });
-    dataMessage(`${ym(item.date)} 별표 ${starred ? "추가" : "해제"}`, "ok");
+    dataMessage(`${ym(item.date)} 즐겨찾기 ${starred ? "추가" : "해제"}`, "ok");
     await Promise.all([loadData(), loadSummary()]);
   } catch (err) {
     dataMessage(err.message, "error");
