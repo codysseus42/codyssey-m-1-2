@@ -35,7 +35,7 @@
 ## 구조
 
 ```
-summer-seoul-chat/
+codyssey-m-1-2/
 ├── backend/
 │   ├── main.py            앱 조립: CORS · 예외 처리 · 라우터 등록
 │   ├── routers/           APIRouter — data.py · chat.py · conversations.py
@@ -119,8 +119,8 @@ CSV 원본은 OpenAI로 보내지 않는다. 모델이 받는 것은 약 900자�
 사전 준비: Firebase 서비스 계정 키, copa 가상 키.
 
 ```bash
-git clone https://github.com/codysseus42/summer-seoul-chat.git
-cd summer-seoul-chat/backend
+git clone https://github.com/codysseus42/codyssey-m-1-2.git
+cd codyssey-m-1-2/backend
 python -m venv .venv
 source .venv/bin/activate            # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
@@ -135,7 +135,7 @@ uvicorn main:app --reload            # http://localhost:8000/docs
 다른 터미널에서 프론트엔드:
 
 ```bash
-cd summer-seoul-chat/frontend
+cd codyssey-m-1-2/frontend
 python -m http.server 3000           # http://localhost:3000
 ```
 

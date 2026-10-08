@@ -1,4 +1,4 @@
-// 여름이었다 — 프론트엔드. API 주소는 config.js(빌드 시 API_BASE_URL로 생성)에서 온다.
+// 서울 불쾌상쾌 AI 비서 — 프론트엔드. API 주소는 config.js(빌드 시 API_BASE_URL로 생성)에서 온다.
 const API = (window.API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
 const SLOW_MS = 5000; // 이보다 오래 걸리면 콜드스타트 안내
 const TIMEOUT_MS = 90000;

@@ -16,7 +16,7 @@ from routers import chat, conversations, data
 load_dotenv()
 
 app = FastAPI(
-    title="Summer Seoul Chat API",
+    title="서울 불쾌상쾌 AI 비서 API",
     description="서울 월별 불쾌지수 데이터 CRUD · 요약 · 데이터 기반 AI 채팅",
     version="1.0.0",
 )
