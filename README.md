@@ -16,9 +16,9 @@
 
 | 구분 | URL |
 |---|---|
-| 프론트엔드 (Vercel) | https://TODO.vercel.app |
-| 백엔드 API (Render) | https://TODO.onrender.com |
-| Swagger UI | https://TODO.onrender.com/docs |
+| 프론트엔드 (Vercel) | https://codyssey-m-1-2-frontend.vercel.app |
+| 백엔드 API (Render) | https://summer-seoul-chat-api.onrender.com |
+| Swagger UI | https://summer-seoul-chat-api.onrender.com/docs |
 
 > Render 무료 티어는 15분간 요청이 없으면 잠든다. 첫 요청이 30초~1분 걸릴 수 있다. 요청이 5초를 넘기면 화면에 안내 문구가 뜬다(콜드스타트와 긴 AI 응답을 구분할 수 없어, 두 경우 모두에 맞는 문구를 쓴다).
 
