@@ -129,6 +129,7 @@ cp .env.example .env                 # 값 채우기
 # Firebase 키 JSON을 backend/firebase-key.json 으로 저장
 
 python seed.py                       # 788건 적재 (여러 번 실행해도 중복 없음)
+# python seed.py --reset             # 원복: 시드 값으로 덮어쓰고 시드에 없는 달은 삭제
 uvicorn main:app --reload            # http://localhost:8000/docs
 ```
 
