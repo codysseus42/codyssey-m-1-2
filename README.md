@@ -22,6 +22,54 @@
 
 > Render 무료 티어는 15분간 요청이 없으면 잠든다. 첫 요청이 30초~1분 걸릴 수 있다. 요청이 5초를 넘기면 화면에 안내 문구가 뜬다(콜드스타트와 긴 AI 응답을 구분할 수 없어, 두 경우 모두에 맞는 문구를 쓴다).
 
+## 평가 기준 대응
+
+명세의 각 항목이 어디에 구현·설명되어 있는지 정리했다.
+
+### 최종 결과물
+
+| 평가 항목 | 대응 코드 | 해당 절 |
+| --- | --- | --- |
+| 데이터 기반 AI 채팅 (요약 반영 답변 + 로딩 표시) | [service.py](./backend/service.py), [app.js](./frontend/app.js) | [컨텍스트 주입 흐름](#컨텍스트-주입-흐름-post-apichat), [채팅 화면](#데이터-요약이-보이는-채팅-질문--답변) |
+| 데이터 관리 CRUD `(date, value, memo)` | [routers/data.py](./backend/routers/data.py) | [API](#api), [데이터 관리 화면](#데이터-관리-추가-결과) |
+| 대화 기록 저장·목록·불러오기 | [routers/conversations.py](./backend/routers/conversations.py) | [API](#api), [대화 기록 화면](#대화-기록-불러오기) |
+| 배포 및 문서화 (프론트·백엔드·Swagger·README) | 이 README | [배포 URL](#배포-url), [배포](#배포) |
+
+### 기능 요구 사항
+
+| 평가 항목 | 대응 코드 | 해당 절 |
+| --- | --- | --- |
+| 1. 개발 환경 (Python 3.10+, venv, 필수 패키지) | [requirements.txt](./backend/requirements.txt) | [로컬 실행](#로컬-실행) |
+| 2. 시계열 데이터 100개 이상 + 요약 정보 | [seoul_di_monthly.csv](./backend/data/seoul_di_monthly.csv), [service.py](./backend/service.py) `compute_summary` | [데이터](#데이터), [컨텍스트 주입 흐름](#컨텍스트-주입-흐름-post-apichat) |
+| 3. FastAPI 구성 · CORS · Swagger | [main.py](./backend/main.py) | [구조](#구조), [배포 URL](#배포-url) |
+| 4. Firestore 연동 · 키는 환경 변수 · `data`/`conversations` 컬렉션 | [store.py](./backend/store.py) | [데이터](#데이터), [환경 변수](#환경-변수) |
+| 5. 데이터 API 5개 (CRUD 4 + summary) | [routers/data.py](./backend/routers/data.py) | [API](#api) |
+| 6. 대화 기록 API + 불러오기 (A안: `GET /api/conversations/{id}`) | [routers/conversations.py](./backend/routers/conversations.py) | [API](#api) |
+| 7. AI 챗봇 API (요약 → 시스템 프롬프트 → GPT → 자동 저장) | [routers/chat.py](./backend/routers/chat.py), [service.py](./backend/service.py) | [컨텍스트 주입 흐름](#컨텍스트-주입-흐름-post-apichat) |
+| 8. Render 배포 · Swagger · 콜드스타트 안내 | [render.yaml](./render.yaml), [app.js](./frontend/app.js) | [배포](#배포), [배포 URL](#배포-url) |
+| 9. 바닐라 프론트 (채팅·데이터 관리·대화 기록·요약) | [frontend/](./frontend/) | [화면](#화면) |
+| 10. Vercel 배포 · `API_BASE_URL` 환경 변수 · README | [vercel.json](./frontend/vercel.json), [build.mjs](./frontend/build.mjs) | [배포](#배포), [환경 변수](#환경-변수) |
+
+### 제약 사항
+
+| 평가 항목 | 대응 코드 | 해당 절 |
+| --- | --- | --- |
+| 백엔드 Render · 프론트엔드 Vercel 배포 | [render.yaml](./render.yaml), [vercel.json](./frontend/vercel.json) | [배포](#배포) |
+| API 키·서비스 계정 키는 환경 변수, 코드에 노출 금지 | [.env.example](./backend/.env.example), [.gitignore](./.gitignore) | [환경 변수](#환경-변수) |
+| 입력 검증과 예외 처리 | [models.py](./backend/models.py), [errors.py](./backend/errors.py) | [구조](#구조), [데이터](#데이터) |
+| 토큰 제한 | [service.py](./backend/service.py) `OPENAI_MAX_COMPLETION_TOKENS` | [환경 변수](#환경-변수) |
+
+### 과제 목표 (설명할 수 있어야 하는 것)
+
+| 항목 | 해당 절 |
+| --- | --- |
+| 시계열 분석 → 요약 정보 → 서비스 활용 흐름 | [데이터](#데이터), [컨텍스트 주입 흐름](#컨텍스트-주입-흐름-post-apichat) |
+| 라우터/서비스 분리 기준 | [구조](#구조) |
+| Pydantic 요청 검증의 이유와 방식 | [구조](#구조), [데이터](#데이터) |
+| Firestore 저장과 CRUD | [데이터](#데이터), [API](#api) |
+| 컨텍스트 주입의 원리 | [컨텍스트 주입 흐름](#컨텍스트-주입-흐름-post-apichat) |
+| 배포 환경에서 CORS·환경 변수·키 관리가 필요한 이유 | [환경 변수](#환경-변수), [배포](#배포) |
+
 ## 기술 스택
 
 | 구분 | 사용 |
