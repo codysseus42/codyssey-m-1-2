@@ -271,6 +271,7 @@ def test_highlights_merge_max_min_and_stars():
     assert "- 2024-08: 80.7 [최고·즐겨찾기] 메모: 역대급 폭염" in prompt
     assert prompt.count("2024-08: 80.7 [") == 1                       # 중복 없이 한 줄
     assert "즐겨찾기하신 달은 N개예요" in prompt and "그달에는" in prompt and "별표" not in prompt
+    assert "무엇을 하셨는지는 기록에 없고" in prompt and "직접 할 수 없습니다" in prompt
 
 
 def test_prompt_classifies_input_types():
