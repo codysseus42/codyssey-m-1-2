@@ -4,7 +4,7 @@ const SLOW_MS = 5000; // 이보다 오래 걸리면 콜드스타트 안내
 const TIMEOUT_MS = 90000;
 
 const $ = (id) => document.getElementById(id);
-const state = { conversationId: null, editingId: null, pending: 0, items: [], filter: "all" };
+const state = { conversationId: null, editingId: null, pending: 0, busy: false, items: [], filter: "all" };
 
 // ---------- 공통 ----------
 
@@ -130,7 +130,12 @@ function showTyping() {
   };
 }
 
+// 답변을 기다리는 동안에는 대화 전환(기록 열기·삭제, 새 대화)도 막는다.
+// 막지 않으면 늦게 도착한 답변이 그사이 바뀐 화면(다른 대화)에 붙는다.
 function setChatBusy(busy) {
+  state.busy = busy;
+  $("history").classList.toggle("busy", busy);
+  document.querySelectorAll("#history button").forEach((b) => { b.disabled = busy; });
   $("chat-send").disabled = busy;
   $("chat-input").disabled = busy;
   $("chat-status").textContent = busy ? "답변 생성 중…" : "";
@@ -168,6 +173,7 @@ async function sendMessage(event) {
 }
 
 function newConversation() {
+  if (state.busy) return;
   state.conversationId = null;
   $("messages").replaceChildren(el("p", { class: "muted hint" }, "새 대화를 시작하세요."));
   highlightHistory();
@@ -205,6 +211,7 @@ function highlightHistory() {
 }
 
 async function openConversation(id) {
+  if (state.busy) return;
   try {
     const conv = await api(`/api/conversations/${encodeURIComponent(id)}`);
     state.conversationId = conv.id;
@@ -217,6 +224,7 @@ async function openConversation(id) {
 }
 
 async function deleteConversation(id) {
+  if (state.busy) return;
   if (!confirm("이 대화를 삭제할까요?")) return;
   try {
     await api(`/api/conversations/${encodeURIComponent(id)}`, { method: "DELETE" });

@@ -147,6 +147,8 @@ h2 { font-size: 1rem; }
   padding: 6px 8px;
 }
 .list li.active { background: var(--user); }
+.history.busy { opacity: 0.55; }
+.history button:disabled { cursor: not-allowed; }
 .list .open {
   flex: 1;
   min-width: 0;
