@@ -8,6 +8,7 @@ from statistics import fmean
 from errors import AIServiceError
 from models import DataItem, Highlight, Message, Point, Summary, today_kst
 
+BASE_START = dt.date(1961, 1, 1)  # 기본 기록(시드 데이터셋)의 시작 달
 TREND_THRESHOLD = 0.5  # 12개월 평균 차이가 이보다 작으면 '유지'
 HISTORY_LIMIT = 10  # 모델에 함께 보낼 이전 메시지 수
 TITLE_LENGTH = 30
@@ -32,17 +33,16 @@ SYSTEM_TEMPLATE = """\
 
 오늘 날짜: {today} (한국 시간). {current_month}은 아직 끝나지 않은 달입니다.
 
-[데이터 요약 — 관측값 기준 (현재 달 이전)]
-- 기간: {period}
-- 레코드: {count}개 (월 단위)
-- 평균 불쾌지수: {average}
-- 최고: {max_value} ({max_date}) / 최저: {min_value} ({min_date}) — 예측값 제외
+[데이터 요약 — 기본 기록 기준: 1961-01부터 지난달까지 (예측값·1961년 이전 추가 기록 제외)]
+- 기간: {period} / 레코드: {count}개월 / 결측: {missing}
+- 통산 평균 불쾌지수: {average}
+- 최고: {max_value} ({max_date}) / 최저: {min_value} ({min_date})
 - 가장 최근: {latest_value} ({latest_date})
 - 최근 추세: {trend} — {trend_detail}
 - 여름 월평균 불쾌지수(10년 단위): {summer}
 
-[예측값 — 현재 달 이후, 사용자가 직접 입력한 값]
-- {forecast}
+[추가 기록 — 사용자가 직접 입력한 예측값(이번 달 이후)과 과거 기록(1961-01 이전)]
+- {added}
 
 [주요 달 — 최고·최저와 사용자가 즐겨찾기한 달, 메모 포함]
 {highlights}
@@ -72,7 +72,7 @@ SYSTEM_TEMPLATE = """\
    (서울 월별 불쾌지수, 1961년부터)를 안내하고, 이미 소개했다면 이해하지 못했다고 짧게 답하세요. 데이터를 억지로 연결하지 마세요.
 5. 데이터에 대한 질문: 위 요약과 분석 결론의 수치만 근거로, 관찰(수치)과 해석(가능한 원인)을 구분해 6문장 이내로 답하세요.
    없는 수치는 추측하지 말고 없다고 말하세요. 서로 다른 비교 기준의 수치를 한 문장에 섞지 마세요.
-   현재 달 이후의 값은 예측값이라고 반드시 밝히고, 관측값과 섞어 결론을 내리지 마세요.
+   이번 달 이후 값은 예측값, 1961년 이전 값은 사용자가 추가한 과거 기록이라고 반드시 밝히고, 기본 기록과 섞어 결론을 내리지 마세요.
    - "덥다", "더위", "기온"을 물으면 불쾌지수와 기온을 구분하세요. 이 데이터는 기온과 습도를 합친 월평균 불쾌지수라서
      기온만으로 가장 더운 달은 알 수 없다고 먼저 짧게 밝히고, 대신 불쾌지수가 가장 높은 달을 알려주세요.
      그 달의 메모에 평균기온이 있으면 함께 말하세요. 불쾌지수가 높다는 것을 "가장 더웠다"로 바꿔 말하지 마세요.
@@ -80,11 +80,24 @@ SYSTEM_TEMPLATE = """\
 답에 그대로 쓰지 말고, 날짜는 "2026년 6월"처럼 쓰세요."""
 
 
+def _mi(d: dt.date) -> int:
+    """달 번호 (연*12 + 월). 달 사이 간격 계산용."""
+    return d.year * 12 + d.month - 1
+
+
+def _ym(i: int) -> str:
+    return f"{i // 12}-{i % 12 + 1:02d}"
+
+
+def _span(rows: list[DataItem]) -> str | None:
+    return f"{rows[0].date:%Y-%m} ~ {rows[-1].date:%Y-%m}" if rows else None
+
+
 def compute_summary(records: list[DataItem], today: dt.date | None = None) -> Summary | None:
     """요약을 계산한다. 데이터가 없으면 None.
 
-    현재 달(진행 중) 이전은 관측값, 현재 달부터는 예측값으로 나눈다.
-    통계는 관측값으로 계산하고, 최고·최저만 예측값 포함 값을 따로 둔다.
+    기본 기록 = 1961-01부터 지난달까지. 이번 달 이후는 예측값, 1961-01 이전은 과거 추가 기록이다.
+    통계는 기본 기록으로 계산하고, 전체 평균과 추가 포함 최고·최저만 추가 기록을 포함한다.
     """
     if not records:
         return None
@@ -92,24 +105,32 @@ def compute_summary(records: list[DataItem], today: dt.date | None = None) -> Su
     month_start = today.replace(day=1)
     everything = sorted(records, key=lambda r: r.date)
     forecast = [r for r in everything if r.date >= month_start]
-    records = [r for r in everything if r.date < month_start] or everything  # 관측값이 없으면 전체로
-    values = [r.value for r in records]
-    top = max(records, key=lambda r: r.value)
-    bottom = min(records, key=lambda r: r.value)
-    top_all = max(everything, key=lambda r: r.value)
-    bottom_all = min(everything, key=lambda r: r.value)
+    past = [r for r in everything if r.date < BASE_START]
+    base = [r for r in everything if BASE_START <= r.date < month_start] or everything  # 기본 기록이 없으면 전체로
 
-    # 최근 12개월 vs 직전 12개월: 12개월 창이라 계절성이 서로 상쇄된다.
-    if len(records) >= 24:
-        recent = fmean(values[-12:])
-        previous = fmean(values[-24:-12])
-        diff = recent - previous
-        trend = "상승" if diff > TREND_THRESHOLD else "하락" if diff < -TREND_THRESHOLD else "유지"
-        detail = f"최근 12개월 평균 {recent:.2f} vs 직전 12개월 {previous:.2f} ({diff:+.2f})"
+    first_i, last_i = _mi(BASE_START), _mi(month_start) - 1  # 1961-01 ~ 지난달
+    have = {_mi(r.date): r.value for r in base}
+    missing = [_ym(i) for i in range(first_i, last_i + 1) if i not in have]
+
+    top, bottom = max(base, key=lambda r: r.value), min(base, key=lambda r: r.value)
+    top_all, bottom_all = max(everything, key=lambda r: r.value), min(everything, key=lambda r: r.value)
+
+    # 최근 12개월 vs 직전 12개월: 마지막 기본 기록 달부터 거꾸로 24개월이 모두 있어야 비교한다.
+    # 12개월 창이라 계절성이 서로 상쇄된다.
+    end_i = _mi(base[-1].date)
+    window = range(end_i - 23, end_i + 1)
+    trend_diff = trend_window = None
+    if all(i in have for i in window):
+        recent = fmean(have[i] for i in window[12:])
+        previous = fmean(have[i] for i in window[:12])
+        trend_diff = round(recent - previous, 2)
+        trend = "상승" if trend_diff > TREND_THRESHOLD else "하락" if trend_diff < -TREND_THRESHOLD else "유지"
+        trend_window = f"{_ym(window[12])} ~ {_ym(end_i)}"
+        detail = f"최근 12개월({trend_window}) 평균 {recent:.2f} vs 직전 12개월 {previous:.2f} ({trend_diff:+.2f})"
     else:
-        trend, detail = "데이터 부족", "비교에 24개월 이상이 필요합니다"
+        trend, detail = "알 수 없음", f"{_ym(end_i)}까지 최근 24개월 중 빠진 달이 있어 비교할 수 없습니다"
 
-    # 주요 달: 최고·최저(예측 제외/포함)와 즐겨찾기한 달. 같은 달은 태그만 합친다.
+    # 주요 달: 최고·최저(기본/추가 포함)와 즐겨찾기한 달. 같은 달은 태그만 합친다.
     tags: dict = defaultdict(list)
     picked: dict = {}
 
@@ -121,39 +142,49 @@ def compute_summary(records: list[DataItem], today: dt.date | None = None) -> Su
     mark(top, "최고")
     mark(bottom, "최저")
     if top_all.date != top.date:
-        mark(top_all, "예측 포함 최고")
+        mark(top_all, "추가 포함 최고")
     if bottom_all.date != bottom.date:
-        mark(bottom_all, "예측 포함 최저")
+        mark(bottom_all, "추가 포함 최저")
     for r in [r for r in everything if r.starred][-STARRED_LIMIT:]:
         mark(r, "즐겨찾기")
     for d, r in picked.items():
         if d >= month_start:
             mark(r, "예측값")
+        elif d < BASE_START:
+            mark(r, "과거 추가")
     highlights = [
         Highlight(date=d, value=picked[d].value, memo=picked[d].memo, tags=tags[d])
         for d in sorted(picked)
     ]
 
     summer: dict[str, list[float]] = defaultdict(list)
-    for r in records:
+    for r in base:
         if r.date.month in (6, 7, 8):
             summer[f"{r.date.year // 10 * 10}s"].append(r.value)
 
     return Summary(
         today=today,
-        period=f"{records[0].date:%Y-%m} ~ {records[-1].date:%Y-%m}",
-        count=len(records),
-        average=round(fmean(values), 2),
+        period=f"{_ym(first_i)} ~ {_ym(last_i)}",
+        count=len(base),
+        missing_count=len(missing),
+        missing_months=missing[:12],
+        total_count=len(everything),
+        forecast_count=len(forecast),
+        forecast_period=_span(forecast),
+        past_count=len(past),
+        past_period=_span(past),
+        average=round(fmean(r.value for r in base), 2),
+        average_all=round(fmean(r.value for r in everything), 2),
         maximum=Point(date=top.date, value=top.value),
         minimum=Point(date=bottom.date, value=bottom.value),
-        maximum_with_forecast=Point(date=top_all.date, value=top_all.value),
-        minimum_with_forecast=Point(date=bottom_all.date, value=bottom_all.value),
-        latest=Point(date=records[-1].date, value=records[-1].value),
+        maximum_all=Point(date=top_all.date, value=top_all.value),
+        minimum_all=Point(date=bottom_all.date, value=bottom_all.value),
+        latest=Point(date=base[-1].date, value=base[-1].value),
         trend=trend,
         trend_detail=detail,
+        trend_diff=trend_diff,
+        trend_window=trend_window,
         summer_by_decade={k: round(fmean(v), 2) for k, v in sorted(summer.items())},
-        forecast_count=len(forecast),
-        forecast_period=f"{forecast[0].date:%Y-%m} ~ {forecast[-1].date:%Y-%m}" if forecast else None,
         highlights=highlights,
     )
 
@@ -161,14 +192,24 @@ def compute_summary(records: list[DataItem], today: dt.date | None = None) -> Su
 def build_system_prompt(summary: Summary | None) -> str:
     if summary is None:
         return "당신은 분석 비서입니다. 현재 저장된 데이터가 없으니, 데이터가 없다고 안내하세요."
-    if summary.forecast_count:
-        hi, lo = summary.maximum_with_forecast, summary.minimum_with_forecast
-        forecast = (
-            f"{summary.forecast_count}개 ({summary.forecast_period}). "
-            f"예측값 포함 최고: {hi.value} ({hi.date:%Y-%m}) / 최저: {lo.value} ({lo.date:%Y-%m})"
+    added_count = summary.forecast_count + summary.past_count
+    if added_count:
+        parts = []
+        if summary.forecast_count:
+            parts.append(f"예측 {summary.forecast_count}개월 ({summary.forecast_period})")
+        if summary.past_count:
+            parts.append(f"과거 {summary.past_count}개월 ({summary.past_period})")
+        hi, lo = summary.maximum_all, summary.minimum_all
+        added = (
+            f"{', '.join(parts)}. 추가 포함 전체 {summary.total_count}개월, 전체 평균 {summary.average_all}, "
+            f"추가 포함 최고: {hi.value} ({hi.date:%Y-%m}) / 최저: {lo.value} ({lo.date:%Y-%m})"
         )
     else:
-        forecast = "없음"
+        added = "없음"
+    missing = f"{summary.missing_count}개월" + (
+        f" ({', '.join(summary.missing_months)}{' 등' if summary.missing_count > len(summary.missing_months) else ''})"
+        if summary.missing_count else ""
+    )
     highlight_lines = []
     for h in summary.highlights:
         line = f"- {h.date:%Y-%m}: {h.value} [{'·'.join(h.tags)}]"
@@ -180,7 +221,8 @@ def build_system_prompt(summary: Summary | None) -> str:
         highlights="\n".join(highlight_lines) or "- 없음",
         today=summary.today.isoformat(),
         current_month=f"{summary.today:%Y-%m}",
-        forecast=forecast,
+        added=added,
+        missing=missing,
         period=summary.period,
         count=summary.count,
         average=summary.average,

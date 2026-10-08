@@ -72,32 +72,36 @@ const fmtTime = (iso) =>
 
 // ---------- 요약 ----------
 
-// 카드 보조 문구: 관측 최고·최저 날짜, 예측값을 넣으면 값이 달라질 때만 "예측 포함" 값을 덧붙인다.
-function withForecast(observed, all) {
-  const base = ym(observed.date);
-  return all.date === observed.date ? base : `${base} · 예측 포함 ${all.value} (${ym(all.date)})`;
+// 최고·최저 카드 보조 문구: 기본 기록의 달, 추가 기록(예측·과거)을 넣어 값이 달라질 때만 "추가 포함" 값을 덧붙인다.
+function withAdded(base, all, s) {
+  const note = ym(base.date);
+  if (all.date === base.date) return note;
+  const kind = all.date >= s.today.slice(0, 7) ? "예측" : "과거";
+  return `${note} · 추가 포함 ${all.value} (${ym(all.date)}, ${kind})`;
 }
 
 async function loadSummary() {
   const box = $("summary");
   try {
     const s = await api("/api/data/summary");
+    const added = s.forecast_count + s.past_count;
     const decades = Object.entries(s.summer_by_decade);
-    const [firstDec, firstVal] = decades[0];
-    const [lastDec, lastVal] = decades[decades.length - 1];
+    const [firstDec, firstVal] = decades[0] ?? ["-", "-"];
+    const [lastDec, lastVal] = decades[decades.length - 1] ?? ["-", "-"];
     const card = (label, value, note = "") =>
       el("div", { class: "card" },
         el("div", { class: "label" }, label),
         el("div", { class: "value" }, String(value)),
         note ? el("div", { class: "note" }, note) : "");
     box.replaceChildren(
-      card("기간", s.period, s.forecast_count ? `관측값 · 예측 ${s.forecast_count}개월 별도` : "관측값"),
-      card("레코드", `${s.count}개월`),
-      card("평균 불쾌지수", s.average),
-      card("최고", s.maximum.value, withForecast(s.maximum, s.maximum_with_forecast)),
-      card("최저", s.minimum.value, withForecast(s.minimum, s.minimum_with_forecast)),
-      card("최근 12개월 추세", s.trend, s.trend_detail.split("(")[1]?.replace(")", "") ?? ""),
-      card("여름 평균", `${firstVal} → ${lastVal}`, `${firstDec} → ${lastDec}`),
+      card("기간", s.period, `결측 ${s.missing_count}개월 · 추가 ${added}개월 (예측 ${s.forecast_count} · 과거 ${s.past_count})`),
+      card("레코드", `${s.count}개월`, `추가 포함 ${s.total_count}개월`),
+      card("통산 평균", s.average, added ? `전체 평균 ${s.average_all} (추가 포함)` : "기본 기록 기준"),
+      card("최고", s.maximum.value, withAdded(s.maximum, s.maximum_all, s)),
+      card("최저", s.minimum.value, withAdded(s.minimum, s.minimum_all, s)),
+      card("최근 12개월 추세", s.trend,
+        s.trend_diff === null ? "최근 24개월 중 빠진 달 있음" : `${s.trend_diff >= 0 ? "+" : ""}${s.trend_diff} · ${s.trend_window}`),
+      card("여름 평균", `${firstVal} → ${lastVal}`, `${firstDec} → ${lastDec} · ${s.period}`),
     );
   } catch (err) {
     box.replaceChildren(el("p", { class: "muted" }, `요약 없음: ${err.message}`));

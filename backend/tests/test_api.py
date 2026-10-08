@@ -1,7 +1,7 @@
 """Firebase·OpenAI 없이 전체 API 흐름을 검증한다. 실행: backend/ 에서 `pytest -q`"""
 
 import sys
-from datetime import date, datetime, timezone
+from datetime import date, timedelta, datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -9,10 +9,10 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import deps  # noqa: E402
+import deps
 import main  # noqa: E402
 from errors import AIServiceError, ConflictError, NotFoundError  # noqa: E402
-from models import DataItem  # noqa: E402
+from models import DataItem, today_kst  # noqa: E402
 from service import build_system_prompt, compute_summary  # noqa: E402
 
 
@@ -160,8 +160,10 @@ def test_summary_values(ctx):
     client, store, _ = ctx
     seed(store, 30)  # 2024-01 ~ 2026-06, 값 50~79
     s = client.get("/api/data/summary").json()
-    assert s["period"] == "2024-01 ~ 2026-06"
-    assert s["count"] == 30
+    last = (today_kst().replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
+    assert s["period"] == f"1961-01 ~ {last}"   # 기본 범위는 데이터가 아니라 1961-01 ~ 지난달
+    assert s["count"] == 30 and s["total_count"] == 30
+    assert s["missing_count"] > 0 and s["missing_months"][0] == "1961-01"
     assert s["maximum"] == {"date": "2026-06-01", "value": 79.0}
     assert s["minimum"] == {"date": "2024-01-01", "value": 50.0}
     assert s["trend"] == "상승"
@@ -170,7 +172,7 @@ def test_summary_values(ctx):
 
 def test_trend_needs_24_months():
     items = [DataItem(id=str(i), date=date(2025, 1, 1).replace(month=i + 1), value=60, memo=None) for i in range(12)]
-    assert compute_summary(items).trend == "데이터 부족"
+    assert compute_summary(items).trend == "알 수 없음"
 
 
 def test_trend_flat_is_stable():
@@ -193,7 +195,7 @@ def test_chat_injects_summary_and_autosaves(ctx):
 
     system = llm.calls[0][0]
     assert system["role"] == "system"
-    assert "2024-01 ~ 2026-06" in system["content"]  # 요약이 주입됨
+    assert "레코드: 30개월" in system["content"]       # 요약이 주입됨
     assert "−1.52%p" in system["content"]            # M1-1 결론 포함
 
     detail = client.get(f"/api/conversations/{cid}").json()
@@ -219,21 +221,22 @@ def test_forecast_split_by_today():
             for m, v in [(7, 77.0), (8, 78.0), (9, 70.0), (10, 90.0), (11, 20.0)]]
     s = compute_summary(rows, today=date(2026, 10, 5))
     assert s.today == date(2026, 10, 5)
-    assert s.period == "2026-07 ~ 2026-09" and s.count == 3      # 관측값만
+    assert s.period == "1961-01 ~ 2026-09" and s.count == 3      # 기본 기록만
     assert s.latest.date == date(2026, 9, 1)
     assert s.maximum.value == 78.0 and s.minimum.value == 70.0    # 예측값 제외
-    assert s.maximum_with_forecast.value == 90.0                   # 예측값 포함
-    assert s.minimum_with_forecast.value == 20.0
+    assert s.maximum_all.value == 90.0                             # 추가 기록 포함
+    assert s.minimum_all.value == 20.0
+    assert s.total_count == 5 and s.average_all == 67.0
     assert s.forecast_count == 2 and s.forecast_period == "2026-10 ~ 2026-11"
     prompt = build_system_prompt(s)
     assert "오늘 날짜: 2026-10-05" in prompt
-    assert "2개 (2026-10 ~ 2026-11)" in prompt and "최고: 90.0 (2026-10)" in prompt
+    assert "예측 2개월 (2026-10 ~ 2026-11)" in prompt and "추가 포함 최고: 90.0 (2026-10)" in prompt
 
 
 def test_no_forecast_prompt_says_none():
     rows = [DataItem(id="2026-08-01", date=date(2026, 8, 1), value=78.0, memo=None)]
     s = compute_summary(rows, today=date(2026, 10, 5))
-    assert s.forecast_count == 0 and s.maximum == s.maximum_with_forecast
+    assert s.forecast_count == 0 and s.maximum == s.maximum_all
     assert "- 없음" in build_system_prompt(s)
 
 
@@ -256,7 +259,7 @@ def test_highlights_merge_max_min_and_stars():
         row(1994, 8, 79.0, "1994 폭염", starred=True),        # 즐겨찾기만
         row(2024, 8, 80.7, "역대급 폭염", starred=True),      # 최고 + 즐겨찾기 → 한 줄
         row(2026, 9, 70.0),
-        row(2026, 11, 85.0, "내 예측", starred=True),         # 예측 포함 최고 + 즐겨찾기 + 예측값
+        row(2026, 11, 85.0, "내 예측", starred=True),         # 추가 포함 최고 + 즐겨찾기 + 예측값
     ]
     s = compute_summary(rows, today=date(2026, 10, 5))
     got = {f"{h.date:%Y-%m}": h.tags for h in s.highlights}
@@ -264,7 +267,7 @@ def test_highlights_merge_max_min_and_stars():
         "1963-01": ["최저"],
         "1994-08": ["즐겨찾기"],
         "2024-08": ["최고", "즐겨찾기"],
-        "2026-11": ["예측 포함 최고", "즐겨찾기", "예측값"],
+        "2026-11": ["추가 포함 최고", "즐겨찾기", "예측값"],
     }
     assert [f"{h.date:%Y-%m}" for h in s.highlights] == sorted(got)  # 날짜순
     prompt = build_system_prompt(s)
@@ -309,3 +312,35 @@ def test_conversations_crud(ctx):
     assert client.get(f"/api/conversations/{cid}").status_code == 404
     assert client.get("/api/conversations?limit=0").status_code == 422
     assert client.post("/api/conversations", json={"messages": []}).status_code == 422
+
+
+def _rows(start: date, n: int, value=60.0):
+    out, y, m = [], start.year, start.month
+    for _ in range(n):
+        out.append(DataItem(id=f"{y}-{m:02d}-01", date=date(y, m, 1), value=value, memo=None))
+        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+    return out
+
+
+def test_past_records_are_separated_from_base():
+    rows = _rows(date(2024, 10, 1), 24) + [
+        DataItem(id="1955-07-01", date=date(1955, 7, 1), value=99.0, memo="과거"),
+        DataItem(id="2026-11-01", date=date(2026, 11, 1), value=10.0, memo=None),
+    ]
+    s = compute_summary(rows, today=date(2026, 10, 5))
+    assert s.count == 24 and s.past_count == 1 and s.forecast_count == 1 and s.total_count == 26
+    assert s.average == 60.0 and s.average_all != 60.0                 # 통산 평균엔 추가 기록 제외
+    assert s.maximum.value == 60.0 and s.maximum_all.value == 99.0
+    assert "1950s" not in s.summer_by_decade                           # 여름 평균도 기본 기록만
+    assert s.trend == "유지" and s.trend_window == "2025-10 ~ 2026-09"
+    tags = {f"{h.date:%Y-%m}": h.tags for h in s.highlights}
+    assert tags["1955-07"] == ["추가 포함 최고", "과거 추가"]
+    assert "과거 1개월 (1955-07 ~ 1955-07)" in build_system_prompt(s)
+
+
+def test_trend_unknown_when_month_missing():
+    rows = [r for r in _rows(date(2024, 9, 1), 24) if r.date != date(2025, 3, 1)]  # 한 달 결측
+    s = compute_summary(rows, today=date(2026, 9, 5))
+    assert s.trend == "알 수 없음" and s.trend_diff is None
+    assert s.missing_count == 788 - 23                                   # 1961-01~2026-08 중 기록 없는 달
+    assert "결측: " in build_system_prompt(s)

@@ -76,25 +76,33 @@ class Highlight(BaseModel):
 
 
 class Summary(BaseModel):
-    """현재 달 이전 = 관측값, 현재 달부터 = 사용자가 입력한 예측값.
-    기간·개수·평균·최고·최저·최근·추세·10년 평균은 관측값 기준이다."""
+    """기본 기록 = 1961-01부터 지난달까지. 예측값(이번 달 이후)과 과거 추가 기록(1961-01 이전)은
+    사용자가 직접 넣은 '추가 기록'으로 따로 센다. 통계는 기본 기록 기준이고, *_all만 추가 기록을 포함한다."""
 
     today: dt.date = Field(description="요약 기준일 (한국 시간)")
-    period: str = Field(examples=["1961-01 ~ 2026-08"])
-    count: int
-    average: float
-    maximum: Point = Field(description="최고 (예측값 제외)")
-    minimum: Point = Field(description="최저 (예측값 제외)")
-    maximum_with_forecast: Point = Field(description="최고 (예측값 포함)")
-    minimum_with_forecast: Point = Field(description="최저 (예측값 포함)")
-    latest: Point
-    trend: Literal["상승", "하락", "유지", "데이터 부족"]
-    trend_detail: str
-    summer_by_decade: dict[str, float] = Field(
-        description="여름(6~8월) 월평균 불쾌지수의 10년 단위 평균"
-    )
-    forecast_count: int = Field(description="예측값 개수 (현재 달 이후)")
+    period: str = Field(description="기본 기록 범위", examples=["1961-01 ~ 2026-09"])
+    count: int = Field(description="기본 기록 개수")
+    missing_count: int = Field(description="기본 범위 안에서 기록이 없는 달 수")
+    missing_months: list[str] = Field(default_factory=list, description="결측 달 (앞에서 12개까지)")
+    total_count: int = Field(description="추가 기록 포함 전체 개수")
+    forecast_count: int = Field(description="예측값 개수 (이번 달 이후)")
     forecast_period: str | None = Field(default=None, examples=["2026-10 ~ 2026-12"])
+    past_count: int = Field(description="과거 추가 기록 개수 (1961-01 이전)")
+    past_period: str | None = Field(default=None, examples=["1955-07 ~ 1955-08"])
+    average: float = Field(description="통산 평균 (기본 기록)")
+    average_all: float = Field(description="전체 평균 (추가 기록 포함)")
+    maximum: Point = Field(description="최고 (기본 기록)")
+    minimum: Point = Field(description="최저 (기본 기록)")
+    maximum_all: Point = Field(description="최고 (추가 기록 포함)")
+    minimum_all: Point = Field(description="최저 (추가 기록 포함)")
+    latest: Point = Field(description="가장 최근 기본 기록")
+    trend: Literal["상승", "하락", "유지", "알 수 없음"]
+    trend_detail: str
+    trend_diff: float | None = Field(default=None, description="최근 12개월 평균 − 직전 12개월 평균")
+    trend_window: str | None = Field(default=None, examples=["2025-09 ~ 2026-08"])
+    summer_by_decade: dict[str, float] = Field(
+        description="여름(6~8월) 월평균 불쾌지수의 10년 단위 평균 (기본 기록)"
+    )
     highlights: list[Highlight] = Field(default_factory=list, description="최고·최저·즐겨찾기한 달 (날짜순, 중복은 한 줄)")
 
 
