@@ -28,13 +28,15 @@ class FakeStore:
         key = item.date.isoformat()
         if key in self.data:
             raise ConflictError()
-        self.data[key] = {"date": key, "value": item.value, "memo": item.memo}
+        self.data[key] = {"date": key, "value": item.value, "memo": item.memo, "starred": item.starred}
         return DataItem(id=key, **self.data[key])
 
     def update_data(self, key, item):
         if key not in self.data:
             raise NotFoundError()
         self.data[key].update(value=item.value, memo=item.memo)
+        if item.starred is not None:
+            self.data[key]["starred"] = item.starred
         return DataItem(id=key, **self.data[key])
 
     def delete_data(self, key):
@@ -231,6 +233,48 @@ def test_no_forecast_prompt_says_none():
     s = compute_summary(rows, today=date(2026, 10, 5))
     assert s.forecast_count == 0 and s.maximum == s.maximum_with_forecast
     assert "- 없음" in build_system_prompt(s)
+
+
+def test_star_kept_when_put_omits_it(ctx):
+    client, _, _ = ctx
+    client.post("/api/data", json={"date": "2024-08-01", "value": 80.75})
+    r = client.put("/api/data/2024-08-01", json={"value": 80.75, "memo": "폭염", "starred": True})
+    assert r.json()["starred"] is True
+    r = client.put("/api/data/2024-08-01", json={"value": 81, "memo": "폭염, 열대야"})  # starred 생략
+    assert r.json()["starred"] is True and r.json()["value"] == 81
+    r = client.put("/api/data/2024-08-01", json={"value": 81, "memo": None, "starred": False})
+    assert r.json()["starred"] is False
+
+
+def test_highlights_merge_max_min_and_stars():
+    def row(y, m, v, memo=None, starred=False):
+        return DataItem(id=f"{y}-{m:02d}-01", date=date(y, m, 1), value=v, memo=memo, starred=starred)
+    rows = [
+        row(1963, 1, 23.3, "역대 최저 추위"),                 # 최저
+        row(1994, 8, 79.0, "1994 폭염", starred=True),        # 별표만
+        row(2024, 8, 80.7, "역대급 폭염", starred=True),      # 최고 + 별표 → 한 줄
+        row(2026, 9, 70.0),
+        row(2026, 11, 85.0, "내 예측", starred=True),         # 예측 포함 최고 + 별표 + 예측값
+    ]
+    s = compute_summary(rows, today=date(2026, 10, 5))
+    got = {f"{h.date:%Y-%m}": h.tags for h in s.highlights}
+    assert got == {
+        "1963-01": ["최저"],
+        "1994-08": ["별표"],
+        "2024-08": ["최고", "별표"],
+        "2026-11": ["예측 포함 최고", "별표", "예측값"],
+    }
+    assert [f"{h.date:%Y-%m}" for h in s.highlights] == sorted(got)  # 날짜순
+    prompt = build_system_prompt(s)
+    assert "- 2024-08: 80.7 [최고·별표] 메모: 역대급 폭염" in prompt
+    assert prompt.count("2024-08: 80.7 [") == 1                       # 중복 없이 한 줄
+    assert "기록에 따르면" in prompt
+
+
+def test_highlight_memo_is_truncated():
+    rows = [DataItem(id="2024-08-01", date=date(2024, 8, 1), value=80.0, memo="가" * 300)]
+    prompt = build_system_prompt(compute_summary(rows, today=date(2026, 10, 5)))
+    assert "가" * 100 + "…" in prompt and "가" * 101 not in prompt
 
 
 def test_system_prompt_without_data():

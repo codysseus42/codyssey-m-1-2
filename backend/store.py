@@ -78,7 +78,7 @@ class FirestoreStore:
         ref = self.db.collection(DATA).document(doc_id)
         if ref.get().exists:
             raise ConflictError()
-        payload = {"date": doc_id, "value": item.value, "memo": item.memo}
+        payload = {"date": doc_id, "value": item.value, "memo": item.memo, "starred": item.starred}
         ref.set(payload)
         self._invalidate()
         return DataItem(id=doc_id, **payload)
@@ -88,9 +88,12 @@ class FirestoreStore:
         snap = ref.get()
         if not snap.exists:
             raise NotFoundError("해당 날짜의 데이터가 없습니다.")
-        ref.update({"value": item.value, "memo": item.memo})
+        changes = {"value": item.value, "memo": item.memo}
+        if item.starred is not None:  # 보내지 않으면 기존 별표 유지
+            changes["starred"] = item.starred
+        ref.update(changes)
         self._invalidate()
-        return DataItem(id=doc_id, **{**snap.to_dict(), "value": item.value, "memo": item.memo})
+        return DataItem(id=doc_id, **{**snap.to_dict(), **changes})
 
     def delete_data(self, doc_id: str) -> None:
         ref = self.db.collection(DATA).document(doc_id)

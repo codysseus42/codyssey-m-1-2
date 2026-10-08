@@ -119,6 +119,8 @@ h2 { font-size: 1rem; }
 }
 .link:hover { color: var(--ink); }
 .link.danger:hover { color: var(--error); }
+.link.star { font-size: 1rem; line-height: 1; }
+.link.star.on { color: var(--accent); }
 
 /* 대화 기록 */
 .list { list-style: none; margin: 0; padding: 0; max-height: 60vh; overflow-y: auto; }

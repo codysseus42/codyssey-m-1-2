@@ -37,6 +37,7 @@ class DataBase(BaseModel):
 
 class DataCreate(DataBase):
     date: dt.date = Field(examples=["2026-08-01"], description="매달 1일 (YYYY-MM-01)")
+    starred: bool = Field(default=False, description="별표. 별표한 달은 메모와 함께 AI 프롬프트에 들어간다")
 
     @field_validator("date")
     @classmethod
@@ -50,7 +51,7 @@ class DataCreate(DataBase):
 
 
 class DataUpdate(DataBase):
-    pass
+    starred: bool | None = Field(default=None, description="보내지 않으면(null) 기존 별표를 유지한다")
 
 
 class DataItem(DataCreate):
@@ -63,6 +64,15 @@ class DataItem(DataCreate):
 class Point(BaseModel):
     date: dt.date
     value: float
+
+
+class Highlight(BaseModel):
+    """프롬프트에 메모와 함께 넣는 주요 달. 같은 달이 여러 이유로 뽑히면 tags에 모두 붙는다."""
+
+    date: dt.date
+    value: float
+    memo: str | None = None
+    tags: list[str] = Field(examples=[["최고", "별표"]])
 
 
 class Summary(BaseModel):
@@ -85,6 +95,7 @@ class Summary(BaseModel):
     )
     forecast_count: int = Field(description="예측값 개수 (현재 달 이후)")
     forecast_period: str | None = Field(default=None, examples=["2026-10 ~ 2026-12"])
+    highlights: list[Highlight] = Field(default_factory=list, description="최고·최저·별표한 달 (날짜순, 중복은 한 줄)")
 
 
 # ---------- 대화 ----------

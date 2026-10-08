@@ -247,6 +247,14 @@ async function loadData() {
           el("td", { class: "num" }, d.value.toFixed(2)),
           el("td", { class: "memo" }, d.memo ?? ""),
           el("td", { class: "actions" },
+            el("button", {
+              class: d.starred ? "link star on" : "link star",
+              type: "button",
+              title: d.starred ? "별표 해제" : "별표 (AI가 이 달의 메모를 참고)",
+              "aria-label": d.starred ? "별표 해제" : "별표",
+              "aria-pressed": String(Boolean(d.starred)),
+              onclick: () => toggleStar(d),
+            }, d.starred ? "★" : "☆"),
             el("button", { class: "link", type: "button", onclick: () => startEdit(d) }, "수정"),
             el("button", { class: "link danger", type: "button", onclick: () => deleteData(d.id) }, "삭제")))),
     );
@@ -343,6 +351,21 @@ async function saveData(event) {
     dataMessage(err.message, "error");
   } finally {
     $("f-submit").disabled = false;
+  }
+}
+
+// 별표만 바꾼다. 값·메모는 그대로 보내고, 요약(주요 달)도 다시 불러온다.
+async function toggleStar(item) {
+  const starred = !item.starred;
+  try {
+    await api(`/api/data/${item.id}`, {
+      method: "PUT",
+      body: JSON.stringify({ value: item.value, memo: item.memo ?? null, starred }),
+    });
+    dataMessage(`${ym(item.date)} 별표 ${starred ? "추가" : "해제"}`, "ok");
+    await Promise.all([loadData(), loadSummary()]);
+  } catch (err) {
+    dataMessage(err.message, "error");
   }
 }
 

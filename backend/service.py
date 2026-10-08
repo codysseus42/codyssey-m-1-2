@@ -6,11 +6,13 @@ from collections import defaultdict
 from statistics import fmean
 
 from errors import AIServiceError
-from models import DataItem, Message, Point, Summary, today_kst
+from models import DataItem, Highlight, Message, Point, Summary, today_kst
 
 TREND_THRESHOLD = 0.5  # 12개월 평균 차이가 이보다 작으면 '유지'
 HISTORY_LIMIT = 10  # 모델에 함께 보낼 이전 메시지 수
 TITLE_LENGTH = 30
+STARRED_LIMIT = 30  # 프롬프트에 넣을 별표 달 최대 개수 (최근 순)
+MEMO_LIMIT = 100  # 프롬프트에 넣을 메모 최대 글자 수
 
 # M1-1 분석(summer-seoul-data REPORT.md)의 결론. CRUD로 바뀌지 않는 고정 배경 지식이다.
 ANALYSIS_NOTES = """\
@@ -42,11 +44,15 @@ SYSTEM_TEMPLATE = """\
 [예측값 — 현재 달 이후, 사용자가 직접 입력한 값]
 - {forecast}
 
+[주요 달 — 최고·최저와 사용자가 별표한 달, 메모 포함]
+{highlights}
+
 [분석 결론 — M1-1 리포트]
 {notes}
 
 규칙:
 - 위 요약과 분석 결론에 있는 수치만 근거로 답하고, 없는 수치는 추측하지 말고 없다고 말하세요.
+- 주요 달의 메모는 사용자가 남긴 기록입니다. 인용할 때는 "기록에 따르면"처럼 사용자의 기록임을 밝히세요.
 - 현재 달 이후의 값은 관측값이 아니라 예측값입니다. 예측값을 말할 때는 반드시 예측값이라고 밝히고, 관측값과 섞어 결론을 내리지 마세요.
 - 관찰(수치)과 해석(가능한 원인)을 구분해서 말하세요.
 - 한국어로 3~6문장 이내로 답하세요."""
@@ -81,6 +87,31 @@ def compute_summary(records: list[DataItem], today: dt.date | None = None) -> Su
     else:
         trend, detail = "데이터 부족", "비교에 24개월 이상이 필요합니다"
 
+    # 주요 달: 최고·최저(예측 제외/포함)와 별표한 달. 같은 달은 태그만 합친다.
+    tags: dict = defaultdict(list)
+    picked: dict = {}
+
+    def mark(r: DataItem, tag: str) -> None:
+        picked[r.date] = r
+        if tag not in tags[r.date]:
+            tags[r.date].append(tag)
+
+    mark(top, "최고")
+    mark(bottom, "최저")
+    if top_all.date != top.date:
+        mark(top_all, "예측 포함 최고")
+    if bottom_all.date != bottom.date:
+        mark(bottom_all, "예측 포함 최저")
+    for r in [r for r in everything if r.starred][-STARRED_LIMIT:]:
+        mark(r, "별표")
+    for d, r in picked.items():
+        if d >= month_start:
+            mark(r, "예측값")
+    highlights = [
+        Highlight(date=d, value=picked[d].value, memo=picked[d].memo, tags=tags[d])
+        for d in sorted(picked)
+    ]
+
     summer: dict[str, list[float]] = defaultdict(list)
     for r in records:
         if r.date.month in (6, 7, 8):
@@ -101,6 +132,7 @@ def compute_summary(records: list[DataItem], today: dt.date | None = None) -> Su
         summer_by_decade={k: round(fmean(v), 2) for k, v in sorted(summer.items())},
         forecast_count=len(forecast),
         forecast_period=f"{forecast[0].date:%Y-%m} ~ {forecast[-1].date:%Y-%m}" if forecast else None,
+        highlights=highlights,
     )
 
 
@@ -115,7 +147,15 @@ def build_system_prompt(summary: Summary | None) -> str:
         )
     else:
         forecast = "없음"
+    highlight_lines = []
+    for h in summary.highlights:
+        line = f"- {h.date:%Y-%m}: {h.value} [{'·'.join(h.tags)}]"
+        if h.memo:
+            memo = h.memo if len(h.memo) <= MEMO_LIMIT else h.memo[:MEMO_LIMIT] + "…"
+            line += f" 메모: {memo}"
+        highlight_lines.append(line)
     return SYSTEM_TEMPLATE.format(
+        highlights="\n".join(highlight_lines) or "- 없음",
         today=summary.today.isoformat(),
         current_month=f"{summary.today:%Y-%m}",
         forecast=forecast,
