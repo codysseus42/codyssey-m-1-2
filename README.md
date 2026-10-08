@@ -37,7 +37,9 @@
 ```
 summer-seoul-chat/
 ├── backend/
-│   ├── main.py            FastAPI 앱 · CORS · 라우트 · 예외 처리
+│   ├── main.py            앱 조립: CORS · 예외 처리 · 라우터 등록
+│   ├── routers/           APIRouter — data.py · chat.py · conversations.py
+│   ├── deps.py            의존성 공급 (store · AI 클라이언트 · ChatService)
 │   ├── models.py          Pydantic 요청/응답 모델 (입력 검증)
 │   ├── errors.py          오류 정의 (404 · 409 · 502 · 503)
 │   ├── store.py           Firestore 저장소
@@ -53,8 +55,9 @@ summer-seoul-chat/
 └── render.yaml
 ```
 
-분리 기준: **라우트(main)는 HTTP만, 검증(models)은 Pydantic만, 저장(store)은 Firestore만, 로직(service)은 계산과 흐름만** 안다.
-그래서 테스트에서는 store와 AI 클라이언트만 가짜로 바꿔 끼워 전체 흐름을 검증한다.
+분리 기준: **라우트(routers)는 HTTP만, 검증(models)은 Pydantic만, 저장(store)은 Firestore만, 로직(service)은 계산과 흐름만** 안다.
+라우트는 store·service를 직접 만들지 않고 `Depends`로 `deps.py`에서 받는다.
+그래서 테스트에서는 `dependency_overrides`로 store와 AI 클라이언트만 가짜로 바꿔 끼워 전체 흐름을 검증한다.
 
 ## 데이터
 

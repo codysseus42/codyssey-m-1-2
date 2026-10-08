@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import deps  # noqa: E402
 import main  # noqa: E402
 from errors import AIServiceError, ConflictError, NotFoundError  # noqa: E402
 from models import DataItem  # noqa: E402
@@ -94,8 +95,9 @@ def seed(store, months=30):
 @pytest.fixture
 def ctx():
     store, llm = FakeStore(), FakeLLM()
-    main.app.dependency_overrides[main.get_store] = lambda: store
-    main.app.dependency_overrides[main.get_llm] = lambda: llm
+    # 키는 deps의 함수 객체여야 한다 (라우터들이 deps에서 가져다 쓰므로)
+    main.app.dependency_overrides[deps.get_store] = lambda: store
+    main.app.dependency_overrides[deps.get_llm] = lambda: llm
     yield TestClient(main.app), store, llm
     main.app.dependency_overrides.clear()
 
