@@ -28,7 +28,7 @@
 |---|---|
 | 백엔드 | Python 3.11, FastAPI, Pydantic, Uvicorn |
 | DB | Firebase Firestore (`firebase-admin`) |
-| AI | OpenAI Python SDK, `gpt-5-mini` (Codyssey copa 프록시 경유) |
+| AI | OpenAI Python SDK, `gpt-5.5` (Codyssey copa 프록시 경유) |
 | 프론트엔드 | HTML / CSS / JavaScript (프레임워크 없음) |
 | 배포 | Render (백엔드), Vercel (프론트엔드) |
 
@@ -155,11 +155,11 @@ pytest -q
 |---|---|---|
 | `OPENAI_API_KEY` | (비밀) | copa 가상 키 |
 | `OPENAI_BASE_URL` | `https://copa.codyssey.kr/v1` | OpenAI 호환 엔드포인트. 비우면 OpenAI 직접 호출 |
-| `OPENAI_MODEL` | `gpt-5-mini` | 모델 |
+| `OPENAI_MODEL` | `gpt-5.5` | 모델 (copa의 GPT 계열: `gpt-5.5` · `gpt-5.4` · `gpt-5.4-mini` · `gpt-5-mini`) |
 | `FIREBASE_SERVICE_ACCOUNT_PATH` | `/etc/secrets/firebase-key.json` | 서비스 계정 키 파일 경로 |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | (선택) | 파일 대신 JSON 문자열로 줄 때 |
 | `ALLOWED_ORIGINS` | `https://xxx.vercel.app` | CORS 허용 출처 (쉼표 구분) |
-| `OPENAI_MAX_COMPLETION_TOKENS` | `2000` | (선택) 응답 토큰 상한 |
+| `OPENAI_MAX_COMPLETION_TOKENS` | `4000` | (선택) 응답 토큰 상한 |
 
 **프론트엔드 (Vercel)**
 

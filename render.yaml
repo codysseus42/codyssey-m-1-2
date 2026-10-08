@@ -15,7 +15,7 @@ services:
       - key: OPENAI_BASE_URL
         value: https://copa.codyssey.kr/v1
       - key: OPENAI_MODEL
-        value: gpt-5-mini
+        value: gpt-5.5
       - key: FIREBASE_SERVICE_ACCOUNT_PATH
         value: /etc/secrets/firebase-key.json
       - key: ALLOWED_ORIGINS

@@ -208,9 +208,9 @@ class OpenAIChatClient:
             base_url=os.getenv("OPENAI_BASE_URL") or None,
             timeout=60,
         )
-        self.model = os.getenv("OPENAI_MODEL", "gpt-5-mini")
+        self.model = os.getenv("OPENAI_MODEL", "gpt-5.5")
         # gpt-5 계열은 max_tokens 대신 max_completion_tokens를 쓰고, 추론 토큰도 여기 포함된다.
-        self.max_tokens = int(os.getenv("OPENAI_MAX_COMPLETION_TOKENS", "2000"))
+        self.max_tokens = int(os.getenv("OPENAI_MAX_COMPLETION_TOKENS", "4000"))
 
     def complete(self, messages: list[dict]) -> str:
         try:
