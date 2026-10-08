@@ -2,6 +2,7 @@
 
     python seed.py           # 시드 788건을 원래 값으로 덮어쓴다 (즐겨찾기도 해제)
     python seed.py --reset   # 위 + 시드에 없는 달(직접 추가한 예측·과거 기록)을 삭제한다
+    python seed.py --all     # --reset + 대화 기록(conversations) 전체 삭제
 
 문서 ID가 날짜라 여러 번 실행해도 같은 문서를 덮어쓸 뿐 중복되지 않는다.
 """
@@ -12,10 +13,18 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from store import DATA, create_firestore_client
+from store import CONVERSATIONS, DATA, create_firestore_client
 
 SEED_FILE = Path(__file__).parent / "data" / "seoul_di_monthly.csv"
 BATCH_SIZE = 400  # Firestore 배치 한도(500) 아래
+
+
+def delete_all(db, refs) -> None:
+    for start in range(0, len(refs), BATCH_SIZE):
+        batch = db.batch()
+        for ref in refs[start : start + BATCH_SIZE]:
+            batch.delete(ref)
+        batch.commit()
 
 
 def main() -> None:
@@ -32,15 +41,16 @@ def main() -> None:
         batch.commit()
         print(f"{min(start + BATCH_SIZE, len(rows))}/{len(rows)}")
 
-    if "--reset" in sys.argv:
+    reset_all = "--all" in sys.argv
+    if reset_all or "--reset" in sys.argv:
         seed_ids = {row["date"] for row in rows}
         extra = [doc.reference for doc in db.collection(DATA).select([]).stream() if doc.id not in seed_ids]
-        for start in range(0, len(extra), BATCH_SIZE):
-            batch = db.batch()
-            for ref in extra[start : start + BATCH_SIZE]:
-                batch.delete(ref)
-            batch.commit()
+        delete_all(db, extra)
         print(f"시드에 없는 {len(extra)}건 삭제: {', '.join(r.id for r in extra) or '없음'}")
+    if reset_all:
+        convs = [doc.reference for doc in db.collection(CONVERSATIONS).select([]).stream()]
+        delete_all(db, convs)
+        print(f"대화 기록 {len(convs)}건 삭제")
     print("완료")
 
 
