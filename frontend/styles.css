@@ -121,6 +121,21 @@ h2 { font-size: 1rem; }
 .link.danger:hover { color: var(--error); }
 .link.star { font-size: 1rem; line-height: 1; }
 .link.star.on { color: var(--accent); }
+.link.insert { font-size: 0.9rem; line-height: 1; opacity: 0.6; }
+.link.insert:hover { opacity: 1; }
+
+.tabs { display: flex; gap: 4px; margin-bottom: 6px; }
+.tab {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  padding: 3px 12px;
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+.tab.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 
 /* 대화 기록 */
 .list { list-style: none; margin: 0; padding: 0; max-height: 60vh; overflow-y: auto; }

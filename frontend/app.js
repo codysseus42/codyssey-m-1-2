@@ -4,7 +4,7 @@ const SLOW_MS = 5000; // 이보다 오래 걸리면 콜드스타트 안내
 const TIMEOUT_MS = 90000;
 
 const $ = (id) => document.getElementById(id);
-const state = { conversationId: null, editingId: null, pending: 0 };
+const state = { conversationId: null, editingId: null, pending: 0, items: [], filter: "all" };
 
 // ---------- 공통 ----------
 
@@ -236,31 +236,72 @@ function dataMessage(text, kind = "") {
 }
 
 async function loadData() {
-  const tbody = $("data-rows");
   try {
-    const items = await api("/api/data");
-    $("data-count").textContent = `${items.length}건`;
-    tbody.replaceChildren(
-      ...items.reverse().map((d) =>
-        el("tr", { "data-id": d.id, class: d.id === state.editingId ? "editing" : "" },
-          el("td", {}, ym(d.date)),
-          el("td", { class: "num" }, d.value.toFixed(2)),
-          el("td", { class: "memo" }, d.memo ?? ""),
-          el("td", { class: "actions" },
-            el("button", {
-              class: d.starred ? "link star on" : "link star",
-              type: "button",
-              title: d.starred ? "별표 해제" : "별표 (AI가 이 달의 메모를 참고)",
-              "aria-label": d.starred ? "별표 해제" : "별표",
-              "aria-pressed": String(Boolean(d.starred)),
-              onclick: () => toggleStar(d),
-            }, d.starred ? "★" : "☆"),
-            el("button", { class: "link", type: "button", onclick: () => startEdit(d) }, "수정"),
-            el("button", { class: "link danger", type: "button", onclick: () => deleteData(d.id) }, "삭제")))),
-    );
+    state.items = (await api("/api/data")).reverse(); // 최신 달이 위
+    renderData();
   } catch (err) {
-    tbody.replaceChildren(el("tr", {}, el("td", { colspan: "4", class: "muted" }, err.message)));
+    $("data-rows").replaceChildren(el("tr", {}, el("td", { colspan: "4", class: "muted" }, err.message)));
   }
+}
+
+// 탭(전체/즐겨찾기)에 맞춰 표만 다시 그린다. 서버 재요청 없음.
+function renderData() {
+  const starredCount = state.items.filter((d) => d.starred).length;
+  const rows = state.filter === "starred" ? state.items.filter((d) => d.starred) : state.items;
+  $("data-count").textContent = `${state.items.length}건`;
+  $("tab-starred").textContent = `즐겨찾기 ${starredCount}`;
+  document.querySelectorAll(".tab").forEach((t) => {
+    const on = t.dataset.filter === state.filter;
+    t.classList.toggle("on", on);
+    t.setAttribute("aria-selected", String(on));
+  });
+  if (rows.length === 0) {
+    const text = state.filter === "starred" ? "별표한 달이 없습니다. ☆를 눌러 추가하세요." : "데이터가 없습니다.";
+    return $("data-rows").replaceChildren(el("tr", {}, el("td", { colspan: "4", class: "muted" }, text)));
+  }
+  $("data-rows").replaceChildren(
+    ...rows.map((d) =>
+      el("tr", { "data-id": d.id, class: d.id === state.editingId ? "editing" : "" },
+        el("td", {}, ym(d.date)),
+        el("td", { class: "num" }, d.value.toFixed(2)),
+        el("td", { class: "memo" }, d.memo ?? ""),
+        el("td", { class: "actions" },
+          el("button", {
+            class: "link insert",
+            type: "button",
+            title: "현재 입력 위치에 날짜 추가",
+            "aria-label": `${monthLabel(d.date)}을 채팅 입력창에 추가`,
+            onmousedown: (e) => e.preventDefault(), // 클릭해도 입력창 커서 위치를 잃지 않게
+            onclick: () => insertIntoChat(monthLabel(d.date)),
+          }, "💬"),
+          el("button", {
+            class: d.starred ? "link star on" : "link star",
+            type: "button",
+            title: d.starred ? "별표 해제" : "별표 (AI가 이 달의 메모를 참고)",
+            "aria-label": d.starred ? "별표 해제" : "별표",
+            "aria-pressed": String(Boolean(d.starred)),
+            onclick: () => toggleStar(d),
+          }, d.starred ? "★" : "☆"),
+          el("button", { class: "link", type: "button", onclick: () => startEdit(d) }, "수정"),
+          el("button", { class: "link danger", type: "button", onclick: () => deleteData(d.id) }, "삭제")))),
+  );
+}
+
+// "2024-08-01" → "2024년 8월"
+function monthLabel(iso) {
+  const [y, m] = iso.split("-");
+  return `${y}년 ${Number(m)}월`;
+}
+
+// 채팅 입력창의 커서(선택 영역) 자리에 텍스트를 끼워 넣고, 커서를 그 뒤로 옮긴다.
+function insertIntoChat(text) {
+  const input = $("chat-input");
+  if (input.disabled) return;
+  const { selectionStart: start, selectionEnd: end, value } = input;
+  const before = start > 0 && !/\s/.test(value[start - 1]) ? " " : ""; // 앞 글자와 붙지 않게
+  const after = end === value.length ? " " : ""; // 뒤에 글이 있으면 붙인다("8월이랑")
+  input.setRangeText(before + text + after, start, end, "end");
+  input.focus();
 }
 
 // ---------- 월 입력 규칙: 현재 달 포함 6개월까지, 현재·미래 달은 예측값임을 알린다 ----------
@@ -408,6 +449,8 @@ $("f-date").max = latestAllowedMonth();
 $("f-date").addEventListener("change", showMonthNotice);
 $("f-date").addEventListener("input", showMonthNotice);
 $("f-cancel").addEventListener("click", () => { resetForm(); dataMessage(""); });
+document.querySelectorAll(".tab").forEach((t) =>
+  t.addEventListener("click", () => { state.filter = t.dataset.filter; renderData(); }));
 
 loadSummary();
 loadHistory();
