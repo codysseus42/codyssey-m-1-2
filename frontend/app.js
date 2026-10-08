@@ -96,7 +96,7 @@ async function loadSummary() {
     box.replaceChildren(
       card("기간", s.period, `결측 ${s.missing_count}개월 · 추가 ${added}개월 (예측 ${s.forecast_count} · 과거 ${s.past_count})`),
       card("레코드", `${s.count}개월`, `추가 포함 ${s.total_count}개월`),
-      card("통산 평균", s.average, added ? `전체 평균 ${s.average_all} (추가 포함)` : "기본 기록 기준"),
+      card("관측 평균", s.average, added ? `추가 포함 ${s.average_all}` : "관측 기록 기준"),
       card("최고", s.maximum.value, withAdded(s.maximum, s.maximum_all, s)),
       card("최저", s.minimum.value, withAdded(s.minimum, s.minimum_all, s)),
       card("최근 12개월 추세", s.trend,
@@ -458,6 +458,18 @@ $("chat-input").addEventListener("keydown", (e) => {
 $("new-chat").addEventListener("click", newConversation);
 $("data-form").addEventListener("submit", saveData);
 $("f-date").max = latestAllowedMonth();
+// 불쾌지수 칸: 숫자·소수점·앞자리 '-'만 남긴다. 한글 입력기 조합 중에는 건드리지 않고 조합이 끝난 뒤 정리한다.
+function keepNumber(e) {
+  if (e.isComposing) return;
+  const input = $("f-value");
+  const cleaned = input.value
+    .replace(/[^0-9.-]/g, "")
+    .replace(/(?!^)-/g, "")
+    .replace(/(\..*)\./g, "$1");
+  if (cleaned !== input.value) input.value = cleaned;
+}
+$("f-value").addEventListener("input", keepNumber);
+$("f-value").addEventListener("compositionend", keepNumber);
 $("f-date").addEventListener("change", showMonthNotice);
 $("f-date").addEventListener("input", showMonthNotice);
 $("f-cancel").addEventListener("click", () => { resetForm(); dataMessage(""); });

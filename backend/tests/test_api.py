@@ -1,7 +1,7 @@
 """Firebase·OpenAI 없이 전체 API 흐름을 검증한다. 실행: backend/ 에서 `pytest -q`"""
 
 import sys
-from datetime import date, timedelta, datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import deps
 import main  # noqa: E402
 from errors import AIServiceError, ConflictError, NotFoundError  # noqa: E402
-from models import DataItem, today_kst  # noqa: E402
+from models import DataItem  # noqa: E402
 from service import build_system_prompt, compute_summary  # noqa: E402
 
 
@@ -160,8 +160,7 @@ def test_summary_values(ctx):
     client, store, _ = ctx
     seed(store, 30)  # 2024-01 ~ 2026-06, 값 50~79
     s = client.get("/api/data/summary").json()
-    last = (today_kst().replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
-    assert s["period"] == f"1961-01 ~ {last}"   # 기본 범위는 데이터가 아니라 1961-01 ~ 지난달
+    assert s["period"] == "1961-01 ~ 2026-06"   # 1961-01 ~ 마지막 기본 기록 달
     assert s["count"] == 30 and s["total_count"] == 30
     assert s["missing_count"] > 0 and s["missing_months"][0] == "1961-01"
     assert s["maximum"] == {"date": "2026-06-01", "value": 79.0}
@@ -344,3 +343,16 @@ def test_trend_unknown_when_month_missing():
     assert s.trend == "알 수 없음" and s.trend_diff is None
     assert s.missing_count == 788 - 23                                   # 1961-01~2026-08 중 기록 없는 달
     assert "결측: " in build_system_prompt(s)
+
+
+def test_recent_unrecorded_month_is_not_missing():
+    rows = _rows(date(2024, 9, 1), 24)                     # 2024-09 ~ 2026-08, 9월 자료는 아직 없음
+    s = compute_summary(rows, today=date(2026, 10, 9))
+    assert s.period == "1961-01 ~ 2026-08"
+    assert s.missing_count == 788 - 24                      # 2026-09는 결측이 아니다
+
+
+def test_prompt_flags_odd_values():
+    prompt = build_system_prompt(compute_summary(_rows(date(2024, 9, 1), 24), today=date(2026, 10, 9)))
+    assert "9월 65~75" in prompt and "혹시 시원한 곳에 계셨나요" in prompt
+    assert "이상한 점이 없으면 이 이야기는 꺼내지 마세요" in prompt

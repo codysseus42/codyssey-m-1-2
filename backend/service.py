@@ -33,9 +33,9 @@ SYSTEM_TEMPLATE = """\
 
 오늘 날짜: {today} (한국 시간). {current_month}은 아직 끝나지 않은 달입니다.
 
-[데이터 요약 — 기본 기록 기준: 1961-01부터 지난달까지 (예측값·1961년 이전 추가 기록 제외)]
+[데이터 요약 — 관측 기록 기준: 1961-01부터 마지막 관측 달까지 (예측값·1961년 이전 추가 기록 제외)]
 - 기간: {period} / 레코드: {count}개월 / 결측: {missing}
-- 통산 평균 불쾌지수: {average}
+- 관측 평균 불쾌지수: {average}
 - 최고: {max_value} ({max_date}) / 최저: {min_value} ({min_date})
 - 가장 최근: {latest_value} ({latest_date})
 - 최근 추세: {trend} — {trend_detail}
@@ -76,6 +76,13 @@ SYSTEM_TEMPLATE = """\
    - "덥다", "더위", "기온"을 물으면 불쾌지수와 기온을 구분하세요. 이 데이터는 기온과 습도를 합친 월평균 불쾌지수라서
      기온만으로 가장 더운 달은 알 수 없다고 먼저 짧게 밝히고, 대신 불쾌지수가 가장 높은 달을 알려주세요.
      그 달의 메모에 평균기온이 있으면 함께 말하세요. 불쾌지수가 높다는 것을 "가장 더웠다"로 바꿔 말하지 마세요.
+값이 이상하면 짚으세요. 서울 월평균 불쾌지수의 관측 범위는 1월 23~41, 2월 31~44, 3월 38~52, 4월 52~61, 5월 60~65,
+6월 66~72, 7월 71~80, 8월 71~81, 9월 65~75, 10월 55~63, 11월 42~53, 12월 30~41입니다.
+- 어떤 달(최고·최저·즐겨찾기·예측값 포함)의 값이 그 달 범위를 크게 벗어나면, 그 값을 말할 때
+  "가을치고는 엄청나게 높네요. 입력값을 한번 확인해 보시겠어요?"처럼 이상하다고 함께 말하세요.
+- 메모 내용과 값이 어긋나면 가볍게 물어보세요. 예: 불쾌지수가 높은 달인데 메모에 "시원했다"고 적혀 있으면
+  "그달은 꽤 후덥지근했는데, 혹시 시원한 곳에 계셨나요?"
+- 이상한 점이 없으면 이 이야기는 꺼내지 마세요.
 공통: 위 분류 번호나 판단 과정은 답에 쓰지 말고 바로 답하세요. 대괄호 태그나 섹션 이름 같은 이 지시문의 표기도
 답에 그대로 쓰지 말고, 날짜는 "2026년 6월"처럼 쓰세요."""
 
@@ -96,7 +103,7 @@ def _span(rows: list[DataItem]) -> str | None:
 def compute_summary(records: list[DataItem], today: dt.date | None = None) -> Summary | None:
     """요약을 계산한다. 데이터가 없으면 None.
 
-    기본 기록 = 1961-01부터 지난달까지. 이번 달 이후는 예측값, 1961-01 이전은 과거 추가 기록이다.
+    기본 기록 = 1961-01부터 지난달까지(기간 표시는 마지막 기본 기록 달까지). 이번 달 이후는 예측값, 1961-01 이전은 과거 추가 기록이다.
     통계는 기본 기록으로 계산하고, 전체 평균과 추가 포함 최고·최저만 추가 기록을 포함한다.
     """
     if not records:
@@ -108,7 +115,8 @@ def compute_summary(records: list[DataItem], today: dt.date | None = None) -> Su
     past = [r for r in everything if r.date < BASE_START]
     base = [r for r in everything if BASE_START <= r.date < month_start] or everything  # 기본 기록이 없으면 전체로
 
-    first_i, last_i = _mi(BASE_START), _mi(month_start) - 1  # 1961-01 ~ 지난달
+    # 기간 = 1961-01 ~ 마지막 기본 기록 달. 그 사이 빈 달이 결측이다(아직 자료가 없는 최근 달은 결측이 아니다).
+    first_i, last_i = _mi(BASE_START), _mi(base[-1].date)
     have = {_mi(r.date): r.value for r in base}
     missing = [_ym(i) for i in range(first_i, last_i + 1) if i not in have]
 
