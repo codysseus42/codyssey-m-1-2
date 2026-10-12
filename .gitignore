@@ -10,3 +10,7 @@ __pycache__/
 
 # 빌드 산출물
 frontend/dist/
+
+# OS·작업용
+.DS_Store
+images/

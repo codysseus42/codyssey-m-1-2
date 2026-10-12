@@ -73,5 +73,5 @@
 |---|---|---|
 | 5-1 | `seed.py --all`로 다시 초기화 (데이터는 최대 10분 뒤 반영, ☆ 한 번 눌렀다 해제하면 즉시) | — |
 | 5-2 | 3-5 질문 → 요약 카드와 질문·답변이 한 화면에 보이게 캡처 | `docs/screenshots/chat.png` |
-| 5-3 | 2-1 추가 → 완료 메시지·새 행·카드 변화가 보이게 캡처 | `docs/screenshots/crud.png` |
+| 5-3 | 2-2 수정 → 완료 메시지·표·카드 변화가 보이게 캡처 | `docs/screenshots/crud.png` |
 | 5-4 | 대화 2개 이상 만든 뒤 4-3 불러오기 상태 캡처 | `docs/screenshots/history.png` |

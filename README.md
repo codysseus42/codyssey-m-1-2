@@ -31,7 +31,7 @@
 | 평가 항목 | 대응 코드 | 해당 절 |
 | --- | --- | --- |
 | 데이터 기반 AI 채팅 (요약 반영 답변 + 로딩 표시) | [service.py](./backend/service.py), [app.js](./frontend/app.js) | [컨텍스트 주입 흐름](#컨텍스트-주입-흐름-post-apichat), [채팅 화면](#데이터-요약이-보이는-채팅-질문--답변) |
-| 데이터 관리 CRUD `(date, value, memo)` | [routers/data.py](./backend/routers/data.py) | [API](#api), [데이터 관리 화면](#데이터-관리-추가-결과) |
+| 데이터 관리 CRUD `(date, value, memo)` | [routers/data.py](./backend/routers/data.py) | [API](#api), [데이터 관리 화면](#데이터-관리-수정-결과) |
 | 대화 기록 저장·목록·불러오기 | [routers/conversations.py](./backend/routers/conversations.py) | [API](#api), [대화 기록 화면](#대화-기록-불러오기) |
 | 배포 및 문서화 (프론트·백엔드·Swagger·README) | 이 README | [배포 URL](#배포-url), [배포](#배포) |
 
@@ -250,10 +250,30 @@ API 키와 서비스 계정 키는 코드와 저장소에 넣지 않는다 (`.gi
 ## 화면
 
 ### 데이터 요약이 보이는 채팅 (질문 + 답변)
+위쪽 요약 카드와 같은 데이터를 근거로, 수치(관찰)와 가능한 원인(해석)을 나눠 답한다.
+
 ![채팅](docs/screenshots/chat.png)
 
-### 데이터 관리 (추가 결과)
+### 데이터 관리 (수정 결과)
+예측값(2026-11)을 수정하면 완료 메시지와 함께 표와 요약 카드(추가 1개월)가 바로 갱신된다.
+
 ![데이터 관리](docs/screenshots/crud.png)
 
 ### 대화 기록 (불러오기)
+왼쪽 목록에서 이전 대화를 누르면 그 대화의 메시지가 다시 표시되고, 이어서 질문하면 이전 맥락을 이어받는다.
+
 ![대화 기록](docs/screenshots/history.png)
+
+### 기능별 화면
+
+| 화면 | 설명 |
+| --- | --- |
+| <img src="docs/screenshots/intro.png" width="360"> | 소개 화면 → "시작하기"로 대시보드 이동 |
+| <img src="docs/screenshots/swagger.png" width="360"> | Swagger UI: data · chat · conversations 엔드포인트 10개 |
+| <img src="docs/screenshots/forecast-confirm.png" width="360"> | 현재·미래 달을 입력하면 예측값인지 확인한 뒤 저장 |
+| <img src="docs/screenshots/validation-limit.png" width="360"> | 현재 달 포함 6개월을 넘는 달은 입력 불가 |
+| <img src="docs/screenshots/duplicate-409.png" width="360"> | 같은 달 중복 추가는 409 "같은 날짜의 데이터가 이미 있습니다." |
+| <img src="docs/screenshots/favorites-tab.png" width="360"> | ☆ 즐겨찾기와 즐겨찾기 탭(즐겨찾기한 달만 보기) |
+| <img src="docs/screenshots/slow-notice.png" width="360"> | 5초 넘는 응답에 콜드스타트 안내, 답변 대기 중에는 대화 기록 잠금 |
+| <img src="docs/screenshots/ai-memo.png" width="360"> | 즐겨찾기 목록, 특정 달의 메모 읽기, 메모 작성 요청은 직접 하도록 안내 |
+| <img src="docs/screenshots/ai-anomaly.png" width="360"> | 추가 기록 반영(추가 포함 최고 90)과 계절 범위를 벗어난 값 짚기 |
