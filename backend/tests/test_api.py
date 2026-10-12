@@ -282,6 +282,7 @@ def test_prompt_classifies_input_types():
         [DataItem(id="2024-08-01", date=date(2024, 8, 1), value=80.0, memo=None)], today=date(2026, 10, 5)))
     for phrase in ("인사·잡담", "착각한 경우", "본인의 기록", "이해할 수 없는 입력", "데이터에 대한 질문", '"그달"로 답하세요'):
         assert phrase in prompt
+    assert "그 질문 자체에는 답하지 마세요" in prompt and "마크다운 기호 없이" in prompt
 
 
 def test_highlight_memo_is_truncated():
