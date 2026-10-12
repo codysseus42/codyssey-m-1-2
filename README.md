@@ -307,4 +307,4 @@ API 키와 서비스 계정 키는 코드와 저장소에 넣지 않는다 (`.gi
 
 | 화면 | 설명 |
 | --- | --- |
-| <img src="docs/screenshots/slow-notice.png" width="360"> | 5초 넘는 응답에 콜드스타트 안내 |
+| <img src="docs/screenshots/cold-start-notice.png" width="360"> | 5초 넘는 응답에 콜드스타트 안내 |
