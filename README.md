@@ -300,6 +300,7 @@ API 키와 서비스 계정 키는 코드와 저장소에 넣지 않는다 (`.gi
 | 화면 | 설명 |
 | --- | --- |
 | <img src="docs/screenshots/chat-new-greeting.png" width="360"> | 인사에는 짧은 자기소개와 질문 예시 |
+| <img src="docs/screenshots/ai-offtopic.png" width="360"> | 데이터와 무관한 질문에는 답하지 않고 다루는 범위를 안내 |
 | <img src="docs/screenshots/ai-memo.png" width="360"> | 즐겨찾기 목록, 특정 달의 메모 읽기, 메모 작성 요청은 직접 하도록 안내 |
 | <img src="docs/screenshots/ai-anomaly.png" width="360"> | 추가 기록 반영(추가 포함 최고 90)과 계절 범위를 벗어난 값 짚기 |
 
