@@ -266,14 +266,45 @@ API 키와 서비스 계정 키는 코드와 저장소에 넣지 않는다 (`.gi
 
 ### 기능별 화면
 
+#### 시작과 문서
+
 | 화면 | 설명 |
 | --- | --- |
 | <img src="docs/screenshots/intro.png" width="360"> | 소개 화면 → "시작하기"로 대시보드 이동 |
 | <img src="docs/screenshots/swagger.png" width="360"> | Swagger UI: data · chat · conversations 엔드포인트 10개 |
+| <img src="docs/screenshots/swagger-summary.png" width="360"> | `GET /api/data/summary` 실행 결과 — 프롬프트에 넣는 요약 |
+
+#### 데이터 관리
+
+| 화면 | 설명 |
+| --- | --- |
 | <img src="docs/screenshots/forecast-confirm.png" width="360"> | 현재·미래 달을 입력하면 예측값인지 확인한 뒤 저장 |
 | <img src="docs/screenshots/validation-limit.png" width="360"> | 현재 달 포함 6개월을 넘는 달은 입력 불가 |
 | <img src="docs/screenshots/duplicate-409.png" width="360"> | 같은 달 중복 추가는 409 "같은 날짜의 데이터가 이미 있습니다." |
-| <img src="docs/screenshots/favorites-tab.png" width="360"> | ☆ 즐겨찾기와 즐겨찾기 탭(즐겨찾기한 달만 보기) |
-| <img src="docs/screenshots/slow-notice.png" width="360"> | 5초 넘는 응답에 콜드스타트 안내, 답변 대기 중에는 대화 기록 잠금 |
+| <img src="docs/screenshots/edit-in-progress.png" width="360"> | 수정 중 — 날짜는 문서 ID라 잠기고, 예측값 달이면 안내 |
+| <img src="docs/screenshots/data-delete-confirm.png" width="360"> | 삭제 전 확인 창 |
+| <img src="docs/screenshots/data-delete-done.png" width="360"> | 삭제 완료 후 표와 요약 카드 갱신 |
+| <img src="docs/screenshots/favorites-star.png" width="360"> | ☆ 눌러 즐겨찾기 — 즐겨찾기한 달은 메모와 함께 AI 프롬프트에 들어감 |
+| <img src="docs/screenshots/favorites-tab.png" width="360"> | 즐겨찾기 탭: 즐겨찾기한 달만 보기 |
+
+#### 대화 기록
+
+| 화면 | 설명 |
+| --- | --- |
+| <img src="docs/screenshots/new-chat-answer.png" width="360"> | 새 대화를 시작하면 목록에 자동 저장 |
+| <img src="docs/screenshots/history-locked.png" width="360"> | 답변 대기 중에는 대화 기록·새 대화 잠금 (다른 대화에 답이 붙는 것 방지) |
+| <img src="docs/screenshots/conversation-delete-confirm.png" width="360"> | 대화 삭제 전 확인 창 |
+
+#### AI 답변
+
+| 화면 | 설명 |
+| --- | --- |
+| <img src="docs/screenshots/chat-new-greeting.png" width="360"> | 인사에는 짧은 자기소개와 질문 예시 |
 | <img src="docs/screenshots/ai-memo.png" width="360"> | 즐겨찾기 목록, 특정 달의 메모 읽기, 메모 작성 요청은 직접 하도록 안내 |
 | <img src="docs/screenshots/ai-anomaly.png" width="360"> | 추가 기록 반영(추가 포함 최고 90)과 계절 범위를 벗어난 값 짚기 |
+
+#### 운영
+
+| 화면 | 설명 |
+| --- | --- |
+| <img src="docs/screenshots/slow-notice.png" width="360"> | 5초 넘는 응답에 콜드스타트 안내 |
