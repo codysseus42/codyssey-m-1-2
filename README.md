@@ -27,11 +27,11 @@
 | 대상 | 확인 방법 | 결과 |
 |---|---|---|
 | 프론트엔드 | 프론트 URL 접속 → 시작하기 | 요약 카드·채팅·데이터 관리 화면 ([채팅 화면](#데이터-요약이-보이는-채팅-질문--답변)) |
-| 백엔드 상태 | `GET /health` | `{"status": "ok"}` |
+| 백엔드 상태 | `GET /health` (Render 헬스체크용) | `{"status":"ok"}` (아래 첫 캡처) |
 | 백엔드 API | Swagger에서 `GET /api/data/summary` 실행 | 200, 아래 응답 |
 | Swagger UI | `/docs` 접속 | 엔드포인트 10개 (아래 캡처) |
 
-<img src="docs/screenshots/swagger.png" width="420"> <img src="docs/screenshots/swagger-summary.png" width="420">
+<img src="docs/screenshots/health.png" width="280"> <img src="docs/screenshots/swagger.png" width="280"> <img src="docs/screenshots/swagger-summary.png" width="280">
 
 `GET /api/data/summary` 응답 (시드 788건, 2026-10-12 기준. `highlights`는 줄임):
 
